@@ -1,0 +1,22 @@
+{
+  "name": "inti-busdisplay-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend Smart Bus Display: pairing device, rute, preset, dan riwayat tampilan panel P5",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning src/server.js",
+    "dev": "node --watch --env-file-if-exists=.env --disable-warning=ExperimentalWarning src/server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "pair:generate": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/pair-generate.js",
+    "devices:list": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/devices.js list",
+    "devices:revoke": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/devices.js revoke",
+    "ble:keygen": "node scripts/ble-keygen.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
