@@ -8,7 +8,7 @@
 #if __has_include("secrets.h")
 #include "secrets.h"
 #else
-#error "include/secrets.h belum ada. Salin include/secrets.h.example menjadi secrets.h lalu isi BLE_KEY."
+#error "include/secrets.h belum ada. Buat dengan: npm run panels:add -- <NAMA-PANEL> --out ../inti-busdisplay-firmware/include/secrets.h (di folder backend)."
 #endif
 
 #include "ble_link.h"
@@ -32,17 +32,17 @@ Preferences prefs;
 uint64_t lastAcceptedTs = 0;
 
 bool keyIsPlaceholder() {
-  for (uint8_t b : BLE_KEY) {
+  for (uint8_t b : PANEL_KEY) {
     if (b != 0) return false;
   }
   return true;
 }
 
 const char* onBleWrite(const uint8_t* data, size_t len) {
-  Update update;
-  switch (decodePacket(data, len, BLE_KEY, update.cfg, update.timestamp)) {
+  DecodedPacket packet;
+  switch (decodePacket(data, len, PANEL_KEY, packet)) {
     case PacketError::BadPacket:
-      Serial.printf("[BLE] paket %u byte ditolak: gagal dekripsi (kunci beda?)\n", len);
+      Serial.printf("[BLE] paket %u byte ditolak: bukan dari device sah atau sudah diubah\n", len);
       return "ERR_PACKET";
     case PacketError::BadJson:
       Serial.println("[BLE] paket ditolak: isi payload tidak valid");
@@ -51,14 +51,32 @@ const char* onBleWrite(const uint8_t* data, size_t len) {
       break;
   }
 
-  // Anti-replay: paket rekaman lama punya ts lebih kecil dari paket terakhir
-  // yang diterima. ts berasal dari jam HP, jadi jam HP perlu otomatis (NTP).
-  if (update.timestamp <= lastAcceptedTs) {
+  // Semua nilai di bawah sudah terautentikasi GCM, jadi tidak bisa dipalsukan
+  // tanpa kredensial yang sah.
+  //
+  // Kredensial berlaku sampai expiresAt (jam server). Timestamp paket memakai
+  // jam server juga (app menambahkan selisih jam), jadi paket dari kredensial
+  // lama ditolak walaupun panel tidak punya jam sendiri. Ini juga batas atas
+  // timestamp: tidak ada paket sah yang bisa "melompat" lebih jauh dari masa
+  // berlaku kredensialnya (maks. CREDENTIAL_TTL_DAYS di backend).
+  if (packet.timestamp / 1000 > packet.expiresAt) {
+    Serial.println("[BLE] paket ditolak: kredensial device sudah kedaluwarsa");
+    return "ERR_EXPIRED";
+  }
+
+  // Anti-replay: paket rekaman lama punya ts lebih kecil dari paket terakhir.
+  if (packet.timestamp <= lastAcceptedTs) {
     Serial.println("[BLE] paket ditolak: timestamp tidak lebih baru (replay?)");
     return "ERR_REPLAY";
   }
-  lastAcceptedTs = update.timestamp;
+  lastAcceptedTs = packet.timestamp;
 
+  if (packet.hello) {
+    Serial.println("[BLE] salam dari aplikasi diterima");
+    return "OK";
+  }
+
+  Update update{packet.config, packet.timestamp};
   xQueueOverwrite(updates, &update);
   return "OK";
 }
@@ -70,9 +88,10 @@ void setup() {
   delay(200);
   Serial.println("\n=== Smart Bus Display - Panel P5 ===");
 
+  Serial.printf("Panel: %s\n", PANEL_NAME);
   runCipherSelfTest();
   if (keyIsPlaceholder()) {
-    Serial.println("[PERINGATAN] BLE_KEY masih nol semua. Isi include/secrets.h dengan kunci dari backend.");
+    Serial.println("[PERINGATAN] PANEL_KEY masih nol semua. Buat secrets.h dengan \"npm run panels:add\" di backend.");
   }
 
   if (!rendererBegin()) {
@@ -90,11 +109,11 @@ void setup() {
     Serial.printf("[NVS] memuat tampilan terakhir: %s\n", saved.route);
     rendererApply(saved);
   } else {
-    rendererShowMessage(BLE_DEVICE_NAME, "SIAP");
+    rendererShowMessage(PANEL_NAME, "SIAP");
   }
 
   updates = xQueueCreate(1, sizeof(Update));
-  bleBegin(onBleWrite);
+  bleBegin(PANEL_NAME, onBleWrite);
 }
 
 void loop() {
@@ -108,6 +127,7 @@ void loop() {
     prefs.putULong64("last_ts", update.timestamp);
   }
 
+  bleTick();
   rendererTick();
   delay(1);
 }

@@ -31,11 +31,22 @@ struct DisplayConfig {
 
 enum class PacketError : uint8_t {
   None,
-  BadPacket,  // panjang salah, kunci salah, atau padding rusak
-  BadJson,    // dekripsi berhasil tapi isinya bukan payload yang valid
+  BadPacket,  // format salah, atau tag GCM tidak cocok (kunci salah / paket diubah)
+  BadJson,    // paket sah tapi isinya bukan payload yang valid
 };
 
-// Mendekripsi paket dari aplikasi: IV (16 byte) || AES-256-CBC(PKCS7) dari
-// JSON {"ts": <ms epoch>, "payload": {...}} lalu mem-parse payload-nya.
-PacketError decodePacket(const uint8_t* data, size_t len, const uint8_t key[32],
-                         DisplayConfig& out, uint64_t& outTimestamp);
+// Isi paket yang sudah terbukti asli (tag GCM cocok).
+struct DecodedPacket {
+  uint64_t timestamp = 0;  // ms, jam server (ditambah selisih oleh app)
+  uint32_t expiresAt = 0;  // detik, batas berlaku kredensial device
+  bool hello = false;      // salam setelah konek: tidak mengubah tampilan
+  DisplayConfig config;    // hanya diisi bila hello == false
+};
+
+// Membuka paket versi 2 dari aplikasi:
+//   [0x02][deviceId 16B][expiresAt u32 BE][nonce 12B][ciphertext][tag 16B]
+// Kunci GCM = HMAC-SHA256(panelKey, "busdisplay-v2" || deviceId || expiresAt).
+// Format ini harus identik dengan app (ble_payload_cipher.dart) dan backend
+// (src/lib/panel-crypto.js).
+PacketError decodePacket(const uint8_t* data, size_t len, const uint8_t panelKey[32],
+                         DecodedPacket& out);

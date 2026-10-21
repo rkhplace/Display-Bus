@@ -1,10 +1,7 @@
 #pragma once
 
-// ---------------------------------------------------------------------------
-// Identitas BLE. Nama ini yang muncul di daftar scan aplikasi.
-// Ganti per panel kalau ada lebih dari satu bus (mis. "P5-BUS-02").
-// ---------------------------------------------------------------------------
-#define BLE_DEVICE_NAME "P5-BUS-01"
+// Nama BLE dan kunci panel ada di include/secrets.h (PANEL_NAME, PANEL_KEY),
+// dibuat per panel dengan "npm run panels:add" di backend.
 
 // Harus sama dengan BleService.serviceUuid / characteristicUuid di aplikasi
 // (lib/core/services/bluetooth_service.dart).
@@ -12,8 +9,12 @@
 #define BLE_CONFIG_CHAR_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
 // Karakteristik status (read + notify): "OK", "ERR_PACKET", "ERR_JSON",
-// "ERR_REPLAY". Belum dibaca aplikasi, tapi berguna untuk debug lewat nRF Connect.
+// "ERR_REPLAY", "ERR_EXPIRED". Aplikasi menunggu balasan ini setiap menulis.
 #define BLE_STATUS_CHAR_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a9"
+
+// Koneksi yang tidak mengirim satu pun paket sah (salam aplikasi) dalam waktu
+// ini diputus, supaya orang lain tidak bisa "menduduki" satu-satunya slot koneksi.
+#define HELLO_TIMEOUT_MS 10000
 
 // ---------------------------------------------------------------------------
 // Panel HUB75 P5 64x32 (scan 1/16, pin E tidak dipakai).
