@@ -36,6 +36,12 @@ const SCHEMA = `
     updated_at  INTEGER NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS panels (
+    name        TEXT PRIMARY KEY COLLATE NOCASE,
+    key         TEXT NOT NULL,
+    created_at  INTEGER NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS display_logs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     device_id   TEXT NOT NULL,

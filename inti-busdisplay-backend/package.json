@@ -14,8 +14,11 @@
     "pair:generate": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/pair-generate.js",
     "devices:list": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/devices.js list",
     "devices:revoke": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/devices.js revoke",
-    "ble:keygen": "node scripts/ble-keygen.js",
-    "db:backup": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/db-backup.js"
+    "db:backup": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/db-backup.js",
+    "panels:add": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/panels.js add",
+    "panels:list": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/panels.js list",
+    "panels:secrets": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/panels.js secrets",
+    "panels:remove": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/panels.js remove"
   },
   "dependencies": {
     "express": "^5.1.0"

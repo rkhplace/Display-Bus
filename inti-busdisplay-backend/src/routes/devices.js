@@ -3,8 +3,9 @@ const { transaction } = require('../db');
 const { HttpError } = require('../lib/http-error');
 const { failureLimiter } = require('../middleware/rate-limit');
 const { generateDeviceToken, hashToken, normalizePairingCode } = require('../lib/tokens');
+const { isUuid } = require('../lib/panel-crypto');
 
-function devicesRouter({ db, config }) {
+function devicesRouter({ db }) {
   const router = express.Router();
 
   const limiter = failureLimiter({
@@ -38,7 +39,8 @@ function devicesRouter({ db, config }) {
       typeof req.body?.deviceName === 'string' ? req.body.deviceName.trim().slice(0, 60) : null;
 
     if (!code) throw new HttpError(400, 'Kode pairing wajib diisi.');
-    if (typeof deviceId !== 'string' || deviceId.length < 8 || deviceId.length > 64) {
+    // deviceId ikut dalam penurunan kunci BLE (16 byte), jadi wajib UUID.
+    if (!isUuid(deviceId)) {
       throw new HttpError(400, 'Device ID tidak valid.');
     }
 
@@ -57,9 +59,9 @@ function devicesRouter({ db, config }) {
       throw new HttpError(400, 'Kode pairing tidak valid atau sudah kedaluwarsa.');
     }
 
-    const data = { deviceId, deviceToken };
-    if (config.bleKey) data.bleKey = config.bleKey;
-    res.status(201).json({ data });
+    // Kunci BLE tidak lagi dibagikan saat pairing: app meminta kredensial per
+    // panel lewat POST /api/panels/:name/credential.
+    res.status(201).json({ data: { deviceId, deviceToken } });
   });
 
   return router;

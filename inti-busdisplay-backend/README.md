@@ -2,7 +2,8 @@
 
 Backend untuk aplikasi Flutter **Smart Bus Display** (folder `../inti-busdisplay-main`). Tugasnya:
 
-- Pairing device (HP/tablet operator) dengan kode sekali pakai, lalu memberi `deviceToken` dan `bleKey`.
+- Pairing device (HP/tablet operator) dengan kode sekali pakai, lalu memberi `deviceToken`.
+- Menyimpan kunci setiap panel dan menerbitkan kredensial BLE per device yang berumur pendek.
 - Menyimpan daftar rute dan preset tampilan.
 - Mencatat riwayat setiap payload yang dikirim aplikasi ke panel P5.
 
@@ -11,12 +12,12 @@ Stack: Node.js + Express 5 + SQLite bawaan Node (`node:sqlite`). Tidak ada depen
 ## Arsitektur singkat
 
 ```
-[App Flutter] --BLE (AES-256-CBC, bleKey)--> [ESP32 + panel P5 64x32]
+[App Flutter] --BLE (AES-256-GCM, kredensial per device)--> [ESP32 + panel P5 64x32]
       |
       +--HTTP /api--> [Backend ini] --> SQLite (data/busdisplay.db)
 ```
 
-Panel tidak pernah berbicara dengan backend. Backend hanya membagikan `bleKey` ke aplikasi saat pairing. Kunci yang sama di-flash ke firmware ESP32.
+Panel tidak pernah berbicara dengan backend. Kunci panel hanya ada di database backend dan di `secrets.h` panel itu. App meminta **kredensial turunan** per panel (`POST /panels/:nama/credential`) yang terikat ke device-nya dan berlaku `CREDENTIAL_TTL_DAYS`. Model lengkapnya ada di [SECURITY.md](../SECURITY.md).
 
 ## Persiapan
 
@@ -25,10 +26,10 @@ Butuh **Node.js 22.13+** (sudah diuji di Node 24).
 ```bash
 npm install
 cp .env.example .env
-npm run ble:keygen
+npm run panels:add -- P5-BUS-01 --out ../inti-busdisplay-firmware/include/secrets.h
 ```
 
-Salin baris `BLE_KEY=...` dari output `ble:keygen` ke `.env`. Array byte `BLE_KEY[32]` di output yang sama dipakai di firmware ESP32. Simpan output ini; kalau kunci diganti, semua device harus pairing ulang dan firmware di-flash ulang.
+Perintah terakhir mendaftarkan panel `P5-BUS-01` dan menulis `secrets.h` (nama + kunci panel) untuk firmware-nya. Ulangi untuk setiap panel dengan nama berbeda.
 
 ## Menjalankan
 
@@ -48,8 +49,11 @@ Saat start, server mencetak nilai `BACKEND_IP`/`BACKEND_PORT`/`BACKEND_SCHEME` u
 | --- | --- |
 | `npm run pair:generate` | Membuat kode pairing 8 karakter, berlaku 15 menit (atur di `PAIRING_CODE_TTL_MINUTES`), sekali pakai |
 | `npm run devices:list` | Daftar device yang sudah dipasangkan beserta waktu terakhir aktif |
-| `npm run devices:revoke -- <deviceId>` | Mencabut device; request berikutnya dibalas 401 dan aplikasi kembali ke layar Pairing |
-| `npm run ble:keygen` | Membuat kunci BLE baru (base64 untuk `.env`, array byte untuk ESP32) |
+| `npm run devices:revoke -- <deviceId>` | Mencabut device: API dibalas 401 dan kredensial panel tidak bisa diperbarui. Kredensial yang sudah ada habis paling lama `CREDENTIAL_TTL_DAYS` (lihat SECURITY.md) |
+| `npm run panels:add -- <nama> [--out path]` | Mendaftarkan panel baru dengan kunci acak, lalu mencetak/menulis `secrets.h` untuk firmware-nya |
+| `npm run panels:secrets -- <nama> [--out path]` | Mencetak ulang `secrets.h` panel yang sudah terdaftar (mis. untuk flash ulang) |
+| `npm run panels:list` | Daftar panel terdaftar |
+| `npm run panels:remove -- <nama>` | Menghapus panel; semua kredensial untuk panel itu langsung tidak bisa diperbarui |
 | `npm run db:backup` | Menyalin database ke `backups/busdisplay-<waktu>.db`, aman walaupun server sedang jalan |
 
 ## API
@@ -61,7 +65,8 @@ Semua endpoint kecuali `status` dan `pair` wajib membawa header `x-device-id` da
 | Method | Path | Auth | Keterangan |
 | --- | --- | --- | --- |
 | GET | `/display/status` | – | Cek server hidup. Tidak memuat data apa pun |
-| POST | `/devices/pair` | – | `{code, deviceId, deviceName?}` → `201 {data:{deviceId, deviceToken, bleKey}}` |
+| POST | `/devices/pair` | – | `{code, deviceId (UUID), deviceName?}` → `201 {data:{deviceId, deviceToken}}` |
+| POST | `/panels/:nama/credential` | ✓ | Kredensial BLE untuk panel itu → `{data:{panel, key, expiresAt, serverTime}}`; `404` bila panel belum terdaftar |
 | GET | `/routes` | ✓ | Daftar rute `{id, code, origin, destination}` |
 | POST | `/routes` | ✓ | Tambah rute → `201`; `409` jika kode sama atau pasangan kota sama (searah/kebalikan) |
 | DELETE | `/routes/:id` | ✓ | Hapus rute; `404` jika tidak ada, `409` jika tinggal 1 rute |
@@ -91,15 +96,9 @@ Sama dengan `DisplayPayloadBuilder.build()` di aplikasi, dan divalidasi server:
 - `animation`: `Running`, `Static`, `Blink`, `Scroll Left`, `Scroll Right`, `Scroll Up`, `Scroll Down`. Kalau menambah mode di `AnimationMode` aplikasi, tambahkan juga di `src/lib/validation.js`.
 - `speed`, `brightness`, `fontSize`: bilangan bulat 0–100.
 
-### Format paket BLE (untuk firmware ESP32)
+### Paket BLE
 
-Aplikasi menulis ke karakteristik BLE: `IV (16 byte) || ciphertext AES-256-CBC (PKCS7)`. Hasil dekripsinya adalah JSON:
-
-```json
-{ "ts": 1760500000000, "payload": { ...payload tampilan di atas... } }
-```
-
-`ts` adalah waktu kirim (ms epoch UTC) dari HP.
+Backend tidak menerima paket BLE, tapi `src/lib/panel-crypto.js` berisi implementasi acuan formatnya (penurunan kunci dan dekripsi), dan test-nya membuka paket vektor uji buatan app. Format lengkapnya ada di [SECURITY.md](../SECURITY.md).
 
 ## Struktur folder
 
@@ -112,7 +111,7 @@ src/
 ├── lib/                   # token & kode pairing, validasi, HttpError
 ├── middleware/            # auth device, pembatas percobaan pairing
 └── routes/                # devices, routes, display (+ presets & logs)
-scripts/                   # CLI admin (pair:generate, devices, ble:keygen)
+scripts/                   # CLI admin (pair:generate, devices, panels, db:backup)
 test/api.test.js           # test seluruh endpoint
 ```
 
@@ -120,7 +119,7 @@ test/api.test.js           # test seluruh endpoint
 
 Untuk pemakaian di luar demo, backend dijalankan di server tetap (server kantor atau VPS), bukan di laptop.
 
-1. **Pasang Node.js 22.13+**, salin folder ini, lalu jalankan `npm ci --omit=dev`. Buat `.env` dengan `BLE_KEY` yang sama dengan firmware.
+1. **Pasang Node.js 22.13+**, salin folder ini **beserta `data/busdisplay.db`** (berisi kunci panel), lalu jalankan `npm ci --omit=dev` dan buat `.env`.
 2. **Jalankan sebagai service** supaya otomatis hidup lagi setelah crash atau reboot, misalnya dengan [pm2](https://pm2.keymetrics.io/):
    ```bash
    pm2 start npm --name busdisplay -- start
@@ -141,12 +140,13 @@ Untuk pemakaian di luar demo, backend dijalankan di server tetap (server kantor 
 
 Yang sudah ada:
 - Token device disimpan sebagai hash SHA-256.
+- Kunci panel tidak pernah keluar dari server; device hanya menerima kredensial turunan berumur pendek.
 - Semua data (rute, preset, riwayat) hanya bisa dibaca device yang sudah dipasangkan.
 - Kode pairing sekali pakai dan kedaluwarsa.
 - Percobaan pairing gagal dibatasi 10 kali per 15 menit per IP.
 - Payload divalidasi.
 
 Yang belum (catatan untuk pengembangan berikutnya):
-- **Semua panel memakai satu `BLE_KEY`.** Idealnya satu kunci per panel.
-- **AES-CBC tanpa MAC.** Lebih aman memakai AES-GCM. Ini perlu diubah di aplikasi dan firmware sekaligus, sebaiknya setelah uji hardware dengan format sekarang lolos.
+- **Database berisi kunci semua panel.** Lindungi file `data/` dan hasil `db:backup` seperti kata sandi.
+- Sisa risiko BLE (flash ESP32 belum dienkripsi, device sah yang berniat jahat) dijelaskan di [SECURITY.md](../SECURITY.md).
 - **HTTPS bergantung pada reverse proxy.** Tanpa langkah Deploy no. 3, lalu lintas berjalan tanpa enkripsi.

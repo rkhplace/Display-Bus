@@ -6,11 +6,11 @@ const { createApp } = require('./app');
 const db = openDatabase(config.dbPath);
 const app = createApp({ db, config });
 
-if (!config.bleKey) {
+const { count: panelCount } = db.prepare('SELECT COUNT(*) AS count FROM panels').get();
+if (panelCount === 0) {
   console.warn(
-    '[PERINGATAN] BLE_KEY belum diset. Device yang pairing tidak akan menerima bleKey,\n' +
-      '  sehingga aplikasi memakai SHA-256(deviceToken) sebagai kunci dan panel tidak bisa\n' +
-      '  mendekripsi payload. Jalankan "npm run ble:keygen" lalu isi BLE_KEY di .env.',
+    '[PERINGATAN] Belum ada panel terdaftar, jadi aplikasi belum bisa mengontrol panel mana pun.\n' +
+      '  Daftarkan dengan: npm run panels:add -- P5-BUS-01',
   );
 }
 

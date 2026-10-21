@@ -4,6 +4,7 @@ const { deviceAuth } = require('./middleware/device-auth');
 const { devicesRouter } = require('./routes/devices');
 const { routesRouter } = require('./routes/routes');
 const { displayRouter } = require('./routes/display');
+const { panelsRouter } = require('./routes/panels');
 
 function createApp({ db, config }) {
   const app = express();
@@ -28,9 +29,10 @@ function createApp({ db, config }) {
 
   app.use(express.json({ limit: '16kb' }));
 
-  app.use('/api/devices', devicesRouter({ db, config }));
+  app.use('/api/devices', devicesRouter({ db }));
   app.use('/api/routes', routesRouter({ db, auth }));
   app.use('/api/display', displayRouter({ db, auth }));
+  app.use('/api/panels', panelsRouter({ db, auth, config }));
 
   app.use((_req, _res, next) => next(new HttpError(404, 'Endpoint tidak ditemukan.')));
 

@@ -26,7 +26,4 @@ console.log(`  Kode pairing : ${code}`);
 console.log(`  Berlaku s/d  : ${new Date(expiresAt).toLocaleString('id-ID')}`);
 console.log('');
 console.log('  Masukkan kode ini di layar "Pasangkan Device" pada aplikasi.');
-if (!config.bleKey) {
-  console.log('  [PERINGATAN] BLE_KEY belum diset, device tidak akan menerima kunci BLE.');
-}
 console.log('');
