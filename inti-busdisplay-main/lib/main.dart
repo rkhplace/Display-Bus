@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app.dart';
 import 'core/providers/connection_provider.dart';
 import 'core/providers/display_settings_provider.dart';
@@ -13,6 +14,10 @@ import 'core/repositories/preset_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Font Poppins dibundel di assets/google_fonts/. Tanpa ini google_fonts akan
+  // mengunduh font saat app jalan, yang gagal di bus tanpa sinyal.
+  GoogleFonts.config.allowRuntimeFetching = false;
 
   try {
     await dotenv.load(fileName: ".env");
