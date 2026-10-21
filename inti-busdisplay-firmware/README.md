@@ -30,7 +30,7 @@ Ini pin default library ESP32-HUB75-MatrixPanel-DMA. Bisa diubah di `include/con
 | GND | GND | | |
 
 - **GND power supply panel dan GND ESP32 wajib disatukan.**
-- GPIO 12 adalah pin strapping. Kalau ESP32 gagal boot saat kabel panel terpasang, cabut R2 sebentar saat upload atau pindahkan R2 ke pin lain di `config.h`.
+- G2 memakai GPIO 32, bukan GPIO 12 (default library). GPIO 12 adalah pin strapping: kalau tertarik HIGH oleh panel saat boot, ESP32 gagal menyala. Jangan pindahkan pin apa pun ke GPIO 12.
 - Kebanyakan panel menerima sinyal 3,3V dari ESP32. Kalau tampilan acak atau berkedip, pasang level shifter 74HCT245.
 
 ## Langkah pertama

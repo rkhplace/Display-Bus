@@ -9,3 +9,6 @@ Thumbs.db
 
 # Log
 *.log
+
+# Clone alat bantu lokal (mis. Bumble untuk simulasi BLE) jangan ikut repo.
+/bumble/
