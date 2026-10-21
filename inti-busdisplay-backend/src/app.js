@@ -10,6 +10,10 @@ function createApp({ db, config }) {
   const auth = deviceAuth(db);
 
   app.disable('x-powered-by');
+  if (config.trustProxy) {
+    const hops = Number(config.trustProxy);
+    app.set('trust proxy', Number.isInteger(hops) ? hops : config.trustProxy);
+  }
 
   // CORS untuk aplikasi versi web (flutter run -d chrome). Aman memakai "*"
   // karena auth lewat header x-device-*, bukan cookie, jadi situs lain tidak
