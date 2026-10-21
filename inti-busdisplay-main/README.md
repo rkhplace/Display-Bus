@@ -227,6 +227,41 @@ Orientasi yang diizinkan (portrait dan landscape) disetel di `main.dart`. Batas 
 
 ---
 
+## Build Release
+
+Identitas aplikasi: **`id.co.inti.busdisplay`** (Android `applicationId` dan iOS bundle ID), nama tampilan **Smart Bus Display**.
+
+### 1. Buat keystore (sekali saja, simpan baik-baik)
+
+```bash
+keytool -genkey -v -keystore busdisplay-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias busdisplay
+```
+
+Simpan file `.jks` dan kata sandinya di tempat aman (mis. password manager kantor). **Kalau keystore hilang, update aplikasi di perangkat yang sudah terpasang tidak bisa ditandatangani lagi.**
+
+### 2. Buat `android/key.properties`
+
+```properties
+storePassword=<kata sandi keystore>
+keyPassword=<kata sandi key>
+keyAlias=busdisplay
+storeFile=C:/path/ke/busdisplay-release.jks
+```
+
+`key.properties`, `*.jks`, dan `*.keystore` sudah di-ignore oleh `android/.gitignore` — jangan pernah di-commit.
+
+### 3. Build
+
+```bash
+flutter build apk --release
+```
+
+Tanpa `key.properties`, Gradle mencetak peringatan dan build release memakai debug key — hanya untuk pengujian, jangan dibagikan.
+
+Naikkan `version` di `pubspec.yaml` setiap rilis (`1.0.1+2`: angka setelah `+` = `versionCode`, wajib selalu naik).
+
+---
+
 ## Panduan Penggunaan Aplikasi
 
 ### 1. Pairing Device (Pertama Kali)
