@@ -22,12 +22,13 @@
 #define PANEL_WIDTH 64
 #define PANEL_HEIGHT 32
 #define PANEL_CHAIN 1
+#define PANEL_DRIVER HUB75_I2S_CFG::SHIFTREG
 
 #define PIN_R1 25
 #define PIN_G1 26
 #define PIN_B1 27
 #define PIN_R2 14
-#define PIN_G2 12
+#define PIN_G2 32
 #define PIN_B2 13
 #define PIN_A 23
 #define PIN_B 19

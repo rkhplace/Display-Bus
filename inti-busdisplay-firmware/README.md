@@ -21,7 +21,7 @@ Ini pin default library ESP32-HUB75-MatrixPanel-DMA. Bisa diubah di `include/con
 | HUB75 | ESP32 GPIO | HUB75 | ESP32 GPIO |
 | --- | --- | --- | --- |
 | R1 | 25 | R2 | 14 |
-| G1 | 26 | G2 | 12 |
+| G1 | 26 | G2 | 32 |
 | B1 | 27 | B2 | 13 |
 | A | 23 | B | 19 |
 | C | 5 | D | 17 |

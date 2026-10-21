@@ -220,6 +220,10 @@ bool rendererBegin() {
   // Double buffer: frame digambar di buffer belakang lalu ditukar, jadi teks
   // berjalan tidak berkedip.
   mxconfig.double_buff = true;
+  // Driver chip panel (lihat PANEL_DRIVER di config.h). Panel dengan FM6124 butuh
+  // inisialisasi khusus; tanpa ini tampilan belang atau hanya sebagian baris menyala.
+  mxconfig.driver = PANEL_DRIVER;
+  // Opsional bila gambar tampak bergeser atau berhantu: coba mxconfig.clkphase = false;
 
   matrix = new MatrixPanel_I2S_DMA(mxconfig);
   ready = matrix->begin();
