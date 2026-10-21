@@ -131,7 +131,7 @@ Layout buildLayout(const DisplayConfig& cfg) {
   // Mode diam/naik-turun: teks harus muat selebar panel. Kecilkan dulu, lalu
   // pecah jadi beberapa baris kalau ukuran 1 pun masih kepanjangan.
   for (uint8_t size = requested; size >= 1; size--) {
-    if (textWidth(single, size) <= PANEL_WIDTH) {
+    if (textWidth(single, size) <= DISPLAY_WIDTH) {
       strcpy(l.lines[0], single);
       l.lineCount = 1;
       l.textSize = size;
@@ -140,7 +140,7 @@ Layout buildLayout(const DisplayConfig& cfg) {
     }
   }
 
-  const int maxChars = PANEL_WIDTH / kCharW;
+  const int maxChars = DISPLAY_WIDTH / kCharW;
   auto addLine = [&](const char* text, bool withArrow) {
     if (!text[0] || l.lineCount >= kMaxLines) return;
     char* dst = l.lines[l.lineCount++];
@@ -167,16 +167,16 @@ uint32_t periodMs() {
 
 // Sama dengan AnimationMode.offsetFor() di aplikasi.
 void offsetFor(float t, int16_t& x, int16_t& y) {
-  const int16_t centerX = (PANEL_WIDTH - layout.width) / 2;
+  const int16_t centerX = (DISPLAY_WIDTH - layout.width) / 2;
   const int16_t centerY = (PANEL_HEIGHT - layout.height) / 2;
   switch (animation) {
     case Animation::Running:
     case Animation::ScrollLeft:
-      x = lerp(PANEL_WIDTH, -layout.width, t);
+      x = lerp(DISPLAY_WIDTH, -layout.width, t);
       y = centerY;
       break;
     case Animation::ScrollRight:
-      x = lerp(-layout.width, PANEL_WIDTH, t);
+      x = lerp(-layout.width, DISPLAY_WIDTH, t);
       y = centerY;
       break;
     case Animation::ScrollUp:

@@ -20,9 +20,14 @@
 // Panel HUB75 P5 64x32 (scan 1/16, pin E tidak dipakai).
 // Pin di bawah adalah pin default library ESP32-HUB75-MatrixPanel-DMA.
 // ---------------------------------------------------------------------------
-#define PANEL_WIDTH 64
+#define PANEL_WIDTH 64   // lebar SATU panel
 #define PANEL_HEIGHT 32
+
+// Jumlah panel yang disambung berantai ke kanan (kabel OUT panel 1 -> IN
+// panel 2). 2 panel = layar 128x32. Teks, animasi, dan pemusatan otomatis
+// memakai lebar total DISPLAY_WIDTH.
 #define PANEL_CHAIN 1
+#define DISPLAY_WIDTH (PANEL_WIDTH * PANEL_CHAIN)
 #define PANEL_DRIVER HUB75_I2S_CFG::SHIFTREG
 
 #define PIN_R1 25

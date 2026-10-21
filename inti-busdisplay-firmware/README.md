@@ -33,6 +33,14 @@ Ini pin default library ESP32-HUB75-MatrixPanel-DMA. Bisa diubah di `include/con
 - G2 memakai GPIO 32, bukan GPIO 12 (default library). GPIO 12 adalah pin strapping: kalau tertarik HIGH oleh panel saat boot, ESP32 gagal menyala. Jangan pindahkan pin apa pun ke GPIO 12.
 - Kebanyakan panel menerima sinyal 3,3V dari ESP32. Kalau tampilan acak atau berkedip, pasang level shifter 74HCT245.
 
+### Dua panel (128x32)
+
+1. Sambung kabel pita HUB75 dari konektor **OUT** panel pertama ke konektor **IN** panel kedua. ESP32 tetap hanya terhubung ke **IN** panel pertama, dan panel kedua dipasang di **kanan** panel pertama.
+2. Setiap panel diberi daya 5V sendiri dari PSU yang sama, minimal **5–6A** untuk dua panel. Semua GND tetap disatukan.
+3. Di `include/config.h`, ubah `#define PANEL_CHAIN 1` menjadi `2`, lalu upload ulang.
+
+Teks berjalan, pemusatan, dan pemecahan baris otomatis memakai lebar total 128 px (`DISPLAY_WIDTH`). Karena lintasannya dua kali lebih panjang dengan waktu tempuh yang sama, teks berjalan terlihat lebih cepat. Turunkan slider Kecepatan di app kalau perlu. Kalau gambar di panel kedua terbalik atau tertukar, cek arah kabel OUT → IN.
+
 ## Langkah pertama
 
 1. **Daftarkan panel di backend** dan tulis kuncinya langsung ke folder ini:
