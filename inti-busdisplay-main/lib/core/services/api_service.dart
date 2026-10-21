@@ -85,9 +85,13 @@ class ApiService {
     required T fallback,
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    // Semua data (rute, preset) hanya untuk device yang sudah dipasangkan.
+    // Sebelum pairing tidak perlu bertanya ke server: pakai fallback saja.
+    if (await _deviceIdentity.getDeviceToken() == null) return fallback;
+
     try {
       final response = await http
-          .get(Uri.parse('$baseUrl$path'))
+          .get(Uri.parse('$baseUrl$path'), headers: await _authHeaders())
           .timeout(timeout);
       if (response.statusCode == 200) {
         return onSuccess(jsonDecode(response.body));

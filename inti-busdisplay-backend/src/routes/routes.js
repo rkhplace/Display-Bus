@@ -29,7 +29,7 @@ function routesRouter({ db, auth }) {
   const countRoutes = db.prepare('SELECT COUNT(*) AS count FROM routes');
   const deleteById = db.prepare('DELETE FROM routes WHERE id = ?');
 
-  router.get('/', (_req, res) => {
+  router.get('/', auth, (_req, res) => {
     res.json({ data: listRoutes.all().map(toRouteJson) });
   });
 

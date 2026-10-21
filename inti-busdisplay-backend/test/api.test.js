@@ -56,16 +56,14 @@ test('GET /display/status membalas 200', async () => {
   const res = await request('GET', '/display/status');
   assert.equal(res.status, 200);
   assert.equal(res.body.data.status, 'ok');
+  assert.equal(res.body.data.lastDisplay, undefined, 'status publik tidak boleh memuat data');
 });
 
-test('GET /routes berisi rute default', async () => {
-  const res = await request('GET', '/routes');
-  assert.equal(res.status, 200);
-  assert.deepEqual(
-    res.body.data.map((r) => r.code),
-    ['B1', 'B2'],
-  );
-  assert.equal(typeof res.body.data[0].id, 'string');
+test('GET data (rute, preset, riwayat) tanpa token ditolak 401', async () => {
+  for (const path of ['/routes', '/display/presets', '/display/logs']) {
+    const res = await request('GET', path);
+    assert.equal(res.status, 401, path);
+  }
 });
 
 test('pairing dengan kode salah ditolak', async () => {
@@ -100,6 +98,16 @@ test('pairing sukses mengembalikan deviceToken dan bleKey, kode tidak bisa dipak
     body: { code: 'ABCD2345', deviceId: 'device-lain-12345' },
   });
   assert.equal(reuse.status, 400);
+});
+
+test('GET /routes dengan token berisi rute default', async () => {
+  const res = await request('GET', '/routes', { headers: auth });
+  assert.equal(res.status, 200);
+  assert.deepEqual(
+    res.body.data.map((r) => r.code),
+    ['B1', 'B2'],
+  );
+  assert.equal(typeof res.body.data[0].id, 'string');
 });
 
 test('endpoint mutasi menolak request tanpa token / token salah dengan 401', async () => {
@@ -143,7 +151,7 @@ test('tambah rute, tolak duplikat kode dan duplikat arah sebaliknya', async () =
 });
 
 test('rute terakhir tidak bisa dihapus', async () => {
-  const { body } = await request('GET', '/routes');
+  const { body } = await request('GET', '/routes', { headers: auth });
   const [first, ...rest] = body.data;
   for (const route of rest) {
     assert.equal((await request('DELETE', `/routes/${route.id}`, { headers: auth })).status, 200);
@@ -156,9 +164,9 @@ test('display/send menyimpan riwayat dan memvalidasi payload', async () => {
   const sent = await request('POST', '/display/send', { headers: auth, body: validPayload });
   assert.equal(sent.status, 200);
 
-  const status = await request('GET', '/display/status');
-  assert.deepEqual(status.body.data.lastDisplay.payload, validPayload);
-  assert.equal(status.body.data.lastDisplay.deviceName, 'Tablet Bus 01');
+  const logs = await request('GET', '/display/logs?limit=1', { headers: auth });
+  assert.deepEqual(logs.body.data[0].payload, validPayload);
+  assert.equal(logs.body.data[0].deviceName, 'Tablet Bus 01');
 
   const invalid = await request('POST', '/display/send', {
     headers: auth,
@@ -187,7 +195,7 @@ test('preset: simpan, tolak nama duplikat, timpa, dan muat', async () => {
   });
   assert.equal(updated.status, 200);
 
-  const list = await request('GET', '/display/presets');
+  const list = await request('GET', '/display/presets', { headers: auth });
   assert.equal(list.body.data.length, 1);
   assert.equal(list.body.data[0].id, id);
   assert.equal(list.body.data[0].name, 'Preset Pagi');

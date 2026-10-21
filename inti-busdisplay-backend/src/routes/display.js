@@ -45,16 +45,10 @@ function displayRouter({ db, auth }) {
   );
   const deletePreset = db.prepare('DELETE FROM presets WHERE id = ?');
 
-  // Dipakai ApiService.checkConnection(): cukup balas 200.
+  // Dipakai ApiService.checkConnection(): cukup balas 200. Sengaja publik dan
+  // tidak memuat data apa pun; riwayat tampilan ada di /logs (wajib auth).
   router.get('/status', (_req, res) => {
-    const [last] = listLogs.all(1);
-    res.json({
-      data: {
-        status: 'ok',
-        serverTime: new Date().toISOString(),
-        lastDisplay: last ? toLogJson(last) : null,
-      },
-    });
+    res.json({ data: { status: 'ok', serverTime: new Date().toISOString() } });
   });
 
   // Dipanggil setelah payload berhasil terkirim ke panel via BLE.
@@ -65,12 +59,12 @@ function displayRouter({ db, auth }) {
     res.json({ data: { id: Number(lastInsertRowid), createdAt: new Date(createdAt).toISOString() } });
   });
 
-  router.get('/logs', (req, res) => {
+  router.get('/logs', auth, (req, res) => {
     const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 20, 1), 200);
     res.json({ data: listLogs.all(limit).map(toLogJson) });
   });
 
-  router.get('/presets', (_req, res) => {
+  router.get('/presets', auth, (_req, res) => {
     res.json({ data: listPresets.all().map(toPresetJson) });
   });
 
