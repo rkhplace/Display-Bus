@@ -110,7 +110,7 @@ UUID `beb5483e-36e1-4688-b7f5-ea07361b26a9` bisa di-read dan di-notify. Setiap k
 
 ## Batasan (catatan pengembangan)
 
-- **iOS:** MTU iOS sekitar 185 byte. Paket dengan nama rute panjang (>~190 byte) perlu *long write*, padahal aplikasi saat ini menulis satu kali. Di Android aman karena aplikasi meminta MTU 512.
+- **iOS:** MTU iOS sekitar 185 byte. Aplikasi mengirim paket yang lebih panjang dengan *long write* (prepare/execute write), dan library BLE ESP32 menggabungkannya sebelum `onWrite`. Ini belum diuji di iPhone.
 - **Anti-replay memakai jam HP.** Panel tidak punya jam sendiri, jadi paket ditolak kalau `ts`-nya tidak lebih baru dari paket terakhir. Cara yang lebih kuat: challenge/nonce dari panel.
 - **AES-CBC tanpa MAC**, dan semua panel memakai satu kunci. Untuk produksi, ganti ke AES-GCM dengan kunci per panel. Ini perlu diubah di aplikasi, backend, dan firmware sekaligus.
 - Belum ada OTA. Update firmware masih lewat kabel USB.

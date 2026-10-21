@@ -185,7 +185,10 @@ class BleService {
         keySourceIsRawKey: bleKey != null,
       );
 
-      await target.write(bytes, withoutResponse: false);
+      // allowLongWrite: di iOS MTU ~185 byte, sedangkan paket bisa sampai
+      // ~400 byte. Paket lalu dikirim bertahap (prepare/execute write) dan
+      // firmware ESP32 menggabungkannya sebelum onWrite dipanggil.
+      await target.write(bytes, withoutResponse: false, allowLongWrite: true);
     } catch (e) {
       debugPrint('Gagal mengirim data via BLE: $e');
       return BleSendResult.writeFailed;

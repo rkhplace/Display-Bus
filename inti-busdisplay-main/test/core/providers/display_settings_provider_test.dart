@@ -84,5 +84,23 @@ void main() {
         expect(provider.fontSize, 16.0);
       },
     );
+
+    test(
+      'menormalkan data preset yang rusak: animasi tak dikenal jadi Static, '
+      'angka dijepit ke 0-100, tipe salah pakai default',
+      () {
+        provider.applyFromPayload({
+          'animation': 'Zigzag',
+          'speed': 150,
+          'brightness': -20,
+          'fontSize': '24',
+        });
+
+        expect(provider.animMode, 'Static');
+        expect(provider.speed, 100.0);
+        expect(provider.brightness, 0.0);
+        expect(provider.fontSize, 16.0);
+      },
+    );
   });
 }

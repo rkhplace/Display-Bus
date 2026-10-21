@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../models/animation_mode.dart';
 
 class DisplaySettingsProvider extends ChangeNotifier {
   String _animMode = 'Scroll Left';
@@ -39,11 +40,23 @@ class DisplaySettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Data preset berasal dari server, jadi dinormalisasi dulu: label animasi
+  /// yang tidak dikenal menjadi Static dan angka dijepit ke 0-100. Tanpa ini,
+  /// dropdown dan slider akan error (assert) saat menerima nilai di luar daftar
+  /// atau rentang.
   void applyFromPayload(Map<String, dynamic> payload) {
-    _animMode = payload['animation'] ?? 'Static';
-    _speed = (payload['speed'] as num?)?.toDouble() ?? 50.0;
-    _brightness = (payload['brightness'] as num?)?.toDouble() ?? 80.0;
-    _fontSize = (payload['fontSize'] as num?)?.toDouble() ?? 16.0;
+    final animation = payload['animation'];
+    _animMode = AnimationMode.fromLabel(
+      animation is String ? animation : null,
+    ).label;
+    _speed = _percentOr(payload['speed'], 50);
+    _brightness = _percentOr(payload['brightness'], 80);
+    _fontSize = _percentOr(payload['fontSize'], 16);
     notifyListeners();
+  }
+
+  static double _percentOr(Object? value, double fallback) {
+    if (value is! num || value.isNaN) return fallback;
+    return value.toDouble().clamp(0, 100);
   }
 }
