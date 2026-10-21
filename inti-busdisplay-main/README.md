@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart&logoColor=white" />
   <img src="https://img.shields.io/badge/State%20Management-Provider-blueviolet" />
   <img src="https://img.shields.io/badge/Auth-Device%20Pairing-success" />
-  <img src="https://img.shields.io/badge/BLE-AES--256%20Encrypted-success" />
+  <img src="https://img.shields.io/badge/BLE-AES--256--GCM-success" />
   <img src="https://img.shields.io/badge/API-HTTPS%20Default-success" />
 </p>
 
@@ -57,7 +57,7 @@
 
 - Memilih rute bus dan arah perjalanan (Pergi/Pulang) yang akan ditampilkan di panel.
 - Mengatur mode animasi teks (scroll, blink, static, dsb), kecepatan, kecerahan, dan ukuran font.
-- Mengirim pengaturan tersebut langsung ke panel LED via **Bluetooth Low Energy (BLE) terenkripsi AES-256**.
+- Mengirim pengaturan tersebut langsung ke panel LED via **Bluetooth Low Energy (BLE) terenkripsi AES-256-GCM** dengan kredensial per panel (lihat [SECURITY.md](../SECURITY.md)).
 - Menyimpan dan memuat kembali kombinasi pengaturan sebagai **preset** (misal: "Preset Pagi", "Preset Rute Jakarta").
 - Menyinkronkan histori pengaturan ke **server backend (HTTPS)** agar dapat dipantau/di-manage terpusat.
 
@@ -70,7 +70,7 @@ Semua kontrol ada di **satu layar** yang menyesuaikan orientasi: 2 kolom saat la
 | Fitur               | Deskripsi                                                                                             |
 | ------------------- | ----------------------------------------------------------------------------------------------------- |
 | Device Pairing      | Autentikasi aman per-perangkat, sesi lokal otomatis kedaluwarsa                                       |
-| Kontrol via BLE     | Kirim pengaturan ke panel P5 tanpa internet, payload terenkripsi AES-256                              |
+| Kontrol via BLE     | Kirim pengaturan ke panel P5 tanpa internet (kredensial disimpan di HP), terenkripsi AES-256-GCM     |
 | Manajemen Rute      | Tambah, pilih, hapus rute; toggle arah Pergi/Pulang; indikator loading                                |
 | Mode Animasi        | 7 mode: Running, Static, Blink, Scroll (4 arah)                                                       |
 | Pengaturan Tampilan | Kecepatan scroll, kecerahan, ukuran font (live preview)                                               |
@@ -101,8 +101,8 @@ lib/
 │   ├── services/
 │   │   ├── api_service.dart           # HTTP client ke backend (HTTPS default, timeout, sanitasi error)
 │   │   ├── bluetooth_service.dart     # Komunikasi BLE ke panel P5 (payload dienkripsi)
-│   │   ├── ble_payload_cipher.dart    # Enkripsi AES-256-CBC untuk payload BLE
-│   │   ├── device_identity_service.dart  # Secure storage device ID, token, bleKey, expiry sesi
+│   │   ├── ble_payload_cipher.dart    # Paket BLE v2: AES-256-GCM + header terautentikasi
+│   │   ├── device_identity_service.dart  # Secure storage device ID, token, kredensial panel, expiry sesi
 │   │   └── auth_session_notifier.dart # Broadcast invalidasi sesi ke seluruh app
 │   ├── theme/
 │   │   ├── app_colors.dart
@@ -274,7 +274,7 @@ Saat aplikasi dibuka pertama kali (atau setelah data aplikasi dihapus, atau sesi
    ```
 2. Admin akan mendapatkan kode 8 karakter (misal: `A7XK2P9Q`), berlaku 15 menit.
 3. Masukkan kode tersebut di layar Pairing aplikasi, lalu tekan **Pasangkan**.
-4. Jika berhasil, aplikasi otomatis masuk ke halaman utama (`MainNavigation`); device token (dan `bleKey` jika disediakan server) tersimpan permanen di secure storage.
+4. Jika berhasil, aplikasi otomatis masuk ke halaman utama (`MainNavigation`); device token tersimpan di secure storage.
 
 > Proses ini **dilakukan ulang otomatis** jika: sesi lokal melewati 30 hari, server menolak token dengan status 401 (mis. device di-revoke admin), atau data aplikasi dihapus. Selama sesi masih valid, splash screen akan langsung mengarahkan ke `MainNavigation`.
 
@@ -350,8 +350,8 @@ final routeProvider = context.read<RouteProvider>();   // baca sekali, untuk aks
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `ApiService`            | Seluruh komunikasi HTTP ke backend (singleton via `ApiService.instance`, HTTPS default, timeout, sanitasi error). Helper internal: `_safeGet<T>()` (GET tanpa auth) dan `_authorizedRequest<T>()` (mutasi dengan device-token auth, auto-invalidate sesi saat 401) |
 | `BleService`            | Scan, connect, disconnect, dan tulis data terenkripsi ke karakteristik BLE panel P5; menolak kirim jika tidak ada kunci enkripsi                                                                                                                                   |
-| `BlePayloadCipher`      | Enkripsi AES-256-CBC payload BLE, dengan pembungkus timestamp untuk mitigasi replay                                                                                                                                                                                |
-| `DeviceIdentityService` | Generate & simpan `deviceId`/`deviceToken`/`bleKey` di secure storage; mengelola kedaluwarsa sesi lokal (30 hari)                                                                                                                                                  |
+| `BlePayloadCipher`      | Paket BLE v2 (AES-256-GCM, header deviceId+masa berlaku diautentikasi, timestamp jam server)                                                                                                                                                                                |
+| `DeviceIdentityService` | Generate & simpan `deviceId`/`deviceToken`/kredensial panel di secure storage; mengelola kedaluwarsa sesi lokal (30 hari)                                                                                                                                                  |
 | `AuthSessionNotifier`   | Singleton `ValueNotifier<bool>` yang di-broadcast ke seluruh app saat sesi device tidak valid lagi, didengarkan oleh `app.dart` untuk auto-redirect ke Pairing                                                                                                     |
 | `RouteRepository`       | Abstraksi CRUD rute — dipanggil `RouteProvider`, meneruskan ke `ApiService`                                                                                                                                                                                        |
 | `PresetRepository`      | Abstraksi CRUD preset — dipanggil `PresetProvider`, meneruskan ke `ApiService`                                                                                                                                                                                     |
@@ -518,7 +518,7 @@ enum AnimationMode {
 | BLE scan tidak menemukan perangkat                          | Izin lokasi/Bluetooth belum diaktifkan (Android)                                                           | Aktifkan izin di pengaturan aplikasi                                                                                                              |
 | "Tidak dapat terhubung ke server"                           | `BACKEND_IP`/`BACKEND_PORT`/`BACKEND_SCHEME` salah, atau device tidak satu jaringan dengan server          | Cek `.env`, pastikan device & server satu WiFi/LAN; jika backend belum punya TLS, set `BACKEND_SCHEME=http`                                       |
 | Kode rute/preset "sudah terdaftar"                          | Duplikat terdeteksi baik di client maupun server (unique constraint DB)                                    | Gunakan kode/nama lain, atau gunakan toggle Pergi/Pulang untuk rute searah terbalik                                                               |
-| Kirim ke Display tidak ada efek di panel                    | BLE belum terhubung, `characteristicUuid` tidak cocok dengan firmware panel, atau tidak ada kunci enkripsi | Cek chip status panel di kanan atas; verifikasi UUID di `bluetooth_service.dart`; pastikan device sudah dipasangkan (ada `bleKey`/device token) |
+| Kirim ke Display tidak ada efek di panel | BLE belum terhubung, atau panel menolak paket | Lihat pesan merah di app; kode penolakan panel dijelaskan di README firmware bagian Troubleshooting |
 | Panel berubah tapi ada banner kuning di atas kartu Rute     | Data berhasil sampai ke panel via BLE, tapi sinkron ke server gagal (server down/timeout)                  | Tekan **Kirim ke Display** lagi untuk mencoba sinkron ulang; banner bisa di-dismiss manual                                                        |
 | Muncul preset warning "rute aslinya sudah tidak tersedia"   | Rute yang tersimpan di preset sudah dihapus setelah preset dibuat                                          | Simpan ulang preset dengan rute yang masih ada, atau abaikan jika rute pertama sudah sesuai kebutuhan                                             |
 
@@ -531,11 +531,10 @@ enum AnimationMode {
 | `provider`               | State management                                      |
 | `http`                   | HTTP client ke backend                                |
 | `flutter_blue_plus`      | Komunikasi Bluetooth Low Energy                       |
-| `flutter_secure_storage` | Penyimpanan aman device ID, token pairing, dan bleKey |
+| `flutter_secure_storage` | Penyimpanan aman device ID, token pairing, dan kredensial panel |
 | `uuid`                   | Generate device ID unik                               |
 | `flutter_dotenv`         | Membaca konfigurasi `.env`                            |
-| `encrypt`                | Enkripsi AES-256-CBC untuk payload BLE                |
-| `crypto`                 | Turunan kunci (SHA-256) fallback untuk enkripsi BLE   |
+| `pointycastle`           | AES-256-GCM untuk paket BLE                           |
 | `google_fonts`           | Font Poppins                                          |
 
 ---

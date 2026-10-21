@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/operation_result.dart';
+import '../models/panel_credential.dart';
+import '../repositories/panel_credential_repository.dart';
 import '../services/api_service.dart';
 import '../services/bluetooth_service.dart';
 import '../services/device_identity_service.dart';
@@ -11,23 +13,33 @@ class ConnectionProvider extends ChangeNotifier {
   final ApiService _apiService;
   final BleService _bleService;
   final DeviceIdentityService _deviceIdentity;
+  final PanelCredentialRepository _credentials;
 
   ConnectionProvider({
     ApiService? apiService,
     BleService? bleService,
     DeviceIdentityService? deviceIdentity,
+    PanelCredentialRepository? credentials,
     @visibleForTesting bool debugInitiallyConnected = false,
+    @visibleForTesting String debugPanelName = 'P5-TEST',
   }) : _apiService = apiService ?? ApiService.instance,
        _bleService = bleService ?? BleService(),
        _deviceIdentity = deviceIdentity ?? DeviceIdentityService(),
-       _isBleConnected = debugInitiallyConnected {
+       _credentials =
+           credentials ??
+           PanelCredentialRepository(
+             apiService: apiService,
+             deviceIdentity: deviceIdentity,
+           ),
+       _isBleConnected = debugInitiallyConnected,
+       _panelName = debugInitiallyConnected ? debugPanelName : null {
     _disconnectSubscription = _bleService.disconnections.listen(
       (_) => _onPanelDisconnected(),
     );
   }
 
   bool _isBleConnected;
-  String _bleDeviceName = 'Belum Terhubung';
+  String? _panelName;
   bool _isScanning = false;
   List<ScanResult> _scanResults = [];
   StreamSubscription<List<ScanResult>>? _scanSubscription;
@@ -38,7 +50,7 @@ class ConnectionProvider extends ChangeNotifier {
   static const Duration scanDuration = Duration(seconds: 4);
 
   bool get isBleConnected => _isBleConnected;
-  String get connectionText => _bleDeviceName;
+  String get connectionText => _panelName ?? 'Belum Terhubung';
   bool get isScanning => _isScanning;
   List<ScanResult> get scanResults => _scanResults;
   bool get lastApiSyncFailed => _lastApiSyncFailed;
@@ -106,57 +118,112 @@ class ConnectionProvider extends ChangeNotifier {
     return FlutterBluePlus.adapterStateNow == BluetoothAdapterState.on;
   }
 
-  Future<bool> connectToDevice(BluetoothDevice device) async {
+  /// Menghubungkan ke panel lalu langsung mengirim salam terenkripsi. Koneksi
+  /// dianggap berhasil hanya bila panel menerima salam itu, jadi kredensial
+  /// yang salah ketahuan sekarang, bukan saat operator menekan Kirim.
+  Future<OperationResult<void>> connectToDevice(BluetoothDevice device) async {
     try {
       await _bleService.connectToDevice(device);
-      _isBleConnected = true;
-      _bleDeviceName = device.platformName;
-      notifyListeners();
-      return true;
     } catch (e) {
-      _isBleConnected = false;
-      notifyListeners();
-      return false;
+      _setDisconnected();
+      return OperationResult.failure(
+        'Gagal terhubung. Pastikan yang dipilih adalah panel P5 dan posisinya '
+        'dekat.',
+      );
     }
+
+    final panel = _bleService.connectedPanelName ?? device.platformName;
+    final hello = await _sendWithCredential(
+      panel,
+      (credential, deviceId) =>
+          _bleService.sendHello(credential: credential, deviceId: deviceId),
+    );
+    if (!hello.success) {
+      _bleService.disconnect();
+      _setDisconnected();
+      return hello;
+    }
+
+    _isBleConnected = true;
+    _panelName = panel;
+    notifyListeners();
+    return OperationResult.success(null, 'Terhubung ke panel $panel.');
   }
 
   void disconnectBle() {
     _bleService.disconnect();
+    _setDisconnected();
+  }
+
+  void _setDisconnected() {
     _isBleConnected = false;
-    _bleDeviceName = 'Belum Terhubung';
+    _panelName = null;
     notifyListeners();
   }
 
   void _onPanelDisconnected() {
     if (!_isBleConnected) return;
-    _isBleConnected = false;
-    _bleDeviceName = 'Belum Terhubung';
-    notifyListeners();
+    _setDisconnected();
   }
+
+  /// Mengambil kredensial [panel], mengirim lewat [send], dan bila panel
+  /// menolak karena kredensial (kedaluwarsa / kunci panel diganti), meminta
+  /// kredensial baru ke server lalu mencoba sekali lagi.
+  Future<OperationResult<void>> _sendWithCredential(
+    String panel,
+    Future<BleSendResult> Function(PanelCredential credential, String deviceId)
+    send,
+  ) async {
+    final deviceId = await _deviceIdentity.getOrCreateDeviceId();
+
+    var credential = await _credentials.credentialFor(panel);
+    if (!credential.success || credential.data == null) {
+      return OperationResult.failure(credential.message ?? _noCredentialMessage);
+    }
+
+    var result = await send(credential.data!, deviceId);
+
+    if (result == BleSendResult.rejectedExpired ||
+        result == BleSendResult.rejectedPacket) {
+      credential = await _credentials.credentialFor(panel, forceRefresh: true);
+      if (!credential.success || credential.data == null) {
+        return OperationResult.failure(
+          credential.message ?? _messageForBleFailure(result)!,
+        );
+      }
+      result = await send(credential.data!, deviceId);
+    }
+
+    final failure = _messageForBleFailure(result);
+    return failure == null
+        ? OperationResult.success(null)
+        : OperationResult.failure(failure);
+  }
+
+  static const _noCredentialMessage =
+      'Kunci akses panel tidak tersedia. Hubungkan HP ke server lalu coba lagi.';
 
   Future<OperationResult<void>> sendPayload(
     Map<String, dynamic> payload,
   ) async {
-    if (!_isBleConnected) {
+    final panel = _panelName;
+    if (!_isBleConnected || panel == null) {
       return OperationResult.failure(
         'Silakan hubungkan Bluetooth ke Panel P5 terlebih dahulu.',
       );
     }
 
-    final bleKey = await _deviceIdentity.getBleKey();
-    final deviceToken = await _deviceIdentity.getDeviceToken();
-
-    final bleResult = await _bleService.sendPayload(
-      payload,
-      bleKey: bleKey,
-      deviceToken: deviceToken,
+    final bleResult = await _sendWithCredential(
+      panel,
+      (credential, deviceId) => _bleService.sendPayload(
+        payload,
+        credential: credential,
+        deviceId: deviceId,
+      ),
     );
 
     // Server hanya disinkronkan kalau panel benar-benar menampilkan data ini.
-    final failureMessage = _messageForBleFailure(bleResult);
-    if (failureMessage != null) {
-      return OperationResult.failure(failureMessage);
-    }
+    if (!bleResult.success) return bleResult;
 
     bool apiSynced = true;
     try {
@@ -191,18 +258,18 @@ class ConnectionProvider extends ChangeNotifier {
       case BleSendResult.notConnected:
       case BleSendResult.writeFailed:
         return 'Gagal mengirim data. Pastikan dekat dengan panel dan coba lagi.';
-      case BleSendResult.noKey:
-        return 'Gagal mengirim data: kunci enkripsi belum ada. Lakukan pairing '
-            'ulang.';
       case BleSendResult.rejectedPacket:
-        return 'Panel menolak data: kunci enkripsi tidak cocok. Pastikan '
-            'BLE_KEY panel sama dengan server, lalu pairing ulang.';
+        return 'Panel menolak kunci akses HP ini. Pastikan panel sudah '
+            'di-flash dengan kunci dari server (panels:secrets), lalu coba lagi.';
       case BleSendResult.rejectedPayload:
         return 'Panel menolak data: format tidak valid (mis. nama rute terlalu '
             'panjang).';
       case BleSendResult.rejectedReplay:
-        return 'Panel menolak data: jam HP lebih lambat dari pengiriman '
-            'terakhir. Aktifkan tanggal & waktu otomatis di HP.';
+        return 'Panel menolak data karena waktunya lebih lama dari pengiriman '
+            'terakhir. Coba kirim ulang.';
+      case BleSendResult.rejectedExpired:
+        return 'Kunci akses panel sudah kedaluwarsa dan server tidak bisa '
+            'dihubungi untuk memperbaruinya.';
       case BleSendResult.noAck:
         return 'Panel tidak membalas, data mungkin belum tampil. Coba kirim '
             'ulang.';

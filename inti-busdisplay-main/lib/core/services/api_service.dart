@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/operation_result.dart';
+import '../models/panel_credential.dart';
 import '../models/route_model.dart';
 import 'device_identity_service.dart';
 import 'auth_session_notifier.dart';
@@ -177,9 +178,8 @@ class ApiService {
         final body = jsonDecode(response.body);
         final data = body['data'] as Map<String, dynamic>;
         final token = data['deviceToken'] as String;
-        final bleKey = data['bleKey'] as String?;
 
-        await _deviceIdentity.saveDeviceToken(token, bleKey: bleKey);
+        await _deviceIdentity.saveDeviceToken(token);
         AuthSessionNotifier.instance.markAuthenticated();
         return OperationResult.success(null, 'Device berhasil dipasangkan!');
       }
@@ -282,6 +282,29 @@ class ApiService {
       },
       defaultErrorMessage: 'Gagal menimpa preset.',
       logLabel: 'updatePreset',
+    );
+  }
+
+  /// Meminta kredensial BLE untuk panel [panelName] (nama BLE panel).
+  Future<OperationResult<PanelCredential>> fetchPanelCredential(
+    String panelName,
+  ) {
+    return _authorizedRequest<PanelCredential>(
+      call: (headers) => http
+          .post(
+            Uri.parse(
+              '$baseUrl/panels/${Uri.encodeComponent(panelName)}/credential',
+            ),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 8)),
+      successStatus: 200,
+      parseData: (body) => PanelCredential.fromApi(
+        body['data'] as Map<String, dynamic>,
+        receivedAt: DateTime.now(),
+      ),
+      defaultErrorMessage: 'Gagal mengambil kunci akses panel dari server.',
+      logLabel: 'fetchPanelCredential',
     );
   }
 

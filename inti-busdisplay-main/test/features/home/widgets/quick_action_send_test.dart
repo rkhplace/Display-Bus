@@ -83,7 +83,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(snackBarColor(tester), AppColors.danger);
-      expect(find.textContaining('jam HP'), findsOneWidget);
+      expect(find.textContaining('Coba kirim ulang'), findsOneWidget);
     },
   );
 }

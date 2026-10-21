@@ -41,8 +41,7 @@ dependencies:
   flutter_blue_plus: ^1.31.18
   flutter_secure_storage: ^9.2.2
   uuid: ^4.4.0
-  encrypt: ^5.0.3
-  crypto: ^3.0.5
+  pointycastle: ^3.9.1
 
 dev_dependencies:
   flutter_test:

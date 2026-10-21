@@ -1,11 +1,31 @@
 import 'package:runningtext_app/core/models/operation_result.dart';
+import 'package:runningtext_app/core/models/panel_credential.dart';
 import 'package:runningtext_app/core/models/route_model.dart';
 import 'package:runningtext_app/core/services/api_service.dart';
+import 'test_credentials.dart';
 
 class FakeApiServiceForConnection implements ApiService {
   OperationResult<void>? sendDisplayConfigResult;
   bool sendDisplayConfigThrows = false;
   Map<String, dynamic>? lastSentPayload;
+
+  /// null = kembalikan kredensial uji baru yang berlaku 7 hari.
+  OperationResult<PanelCredential>? credentialResult;
+  int fetchCredentialCallCount = 0;
+  int _issued = 0;
+
+  @override
+  Future<OperationResult<PanelCredential>> fetchPanelCredential(
+    String panelName,
+  ) async {
+    fetchCredentialCallCount++;
+    // Setiap kredensial baru punya kunci berbeda, seperti di server sungguhan
+    // (masa berlaku ikut dalam penurunan kunci).
+    return credentialResult ??
+        OperationResult.success(
+          testCredential(panel: panelName, keySeed: ++_issued),
+        );
+  }
 
   @override
   Future<OperationResult<void>> sendDisplayConfig(

@@ -1,3 +1,4 @@
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runningtext_app/core/models/operation_result.dart';
 import 'package:runningtext_app/core/providers/connection_provider.dart';
@@ -6,6 +7,7 @@ import 'package:runningtext_app/core/services/bluetooth_service.dart';
 import '../../fakes/fake_ble_service.dart';
 import '../../fakes/fake_device_identity_service.dart';
 import '../../fakes/fake_api_service_for_connection.dart';
+import '../../fakes/test_credentials.dart';
 
 void main() {
   late FakeBleService fakeBle;
@@ -78,18 +80,17 @@ void main() {
     );
 
     test(
-      'meneruskan bleKey dan deviceToken dari DeviceIdentityService',
+      'mengirim dengan kredensial panel yang terhubung dan deviceId HP ini',
       () async {
-        fakeDeviceIdentity.bleKeyToReturn = 'my-ble-key';
-        fakeDeviceIdentity.deviceTokenToReturn = 'my-token';
         fakeBle.sendPayloadResult = BleSendResult.ok;
         fakeApi.sendDisplayConfigResult = OperationResult.success(null);
         final provider = buildProvider();
 
         await provider.sendPayload(samplePayload);
 
-        expect(fakeBle.lastBleKey, 'my-ble-key');
-        expect(fakeBle.lastDeviceToken, 'my-token');
+        expect(fakeBle.lastCredential?.panel, 'P5-TEST');
+        expect(fakeBle.lastDeviceId, fakeDeviceIdentity.deviceIdToReturn);
+        expect(fakeDeviceIdentity.savedCredentials, contains('P5-TEST'));
       },
     );
   });
@@ -200,11 +201,11 @@ void main() {
 
   group('ConnectionProvider.sendPayload - panel menolak atau tidak membalas', () {
     final cases = {
-      BleSendResult.rejectedPacket: 'kunci enkripsi tidak cocok',
+      BleSendResult.rejectedPacket: 'menolak kunci akses',
       BleSendResult.rejectedPayload: 'format tidak valid',
-      BleSendResult.rejectedReplay: 'jam HP',
+      BleSendResult.rejectedReplay: 'Coba kirim ulang',
+      BleSendResult.rejectedExpired: 'kedaluwarsa',
       BleSendResult.noAck: 'tidak membalas',
-      BleSendResult.noKey: 'pairing',
     };
 
     cases.forEach((bleResult, expectedMessage) {
@@ -251,6 +252,10 @@ void main() {
         BleSendResult.rejectedReplay,
       );
       expect(
+        BleService.resultForStatus('ERR_EXPIRED'),
+        BleSendResult.rejectedExpired,
+      );
+      expect(
         BleService.resultForStatus('ERR_JSON'),
         BleSendResult.rejectedPayload,
       );
@@ -258,6 +263,96 @@ void main() {
         BleService.resultForStatus('apa saja'),
         BleSendResult.rejectedPayload,
       );
+    });
+  });
+
+  group('ConnectionProvider.connectToDevice', () {
+    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:FF');
+
+    test('berhasil: ambil kredensial dari server, kirim salam, lalu terhubung', () async {
+      final provider = buildProvider(connected: false);
+
+      final result = await provider.connectToDevice(device);
+
+      expect(result.success, isTrue);
+      expect(provider.isBleConnected, isTrue);
+      expect(provider.connectionText, 'P5-BUS-01');
+      expect(fakeBle.helloCallCount, 1);
+      expect(fakeBle.lastCredential?.panel, 'P5-BUS-01');
+      expect(fakeDeviceIdentity.savedCredentials, contains('P5-BUS-01'));
+    });
+
+    test('panel belum terdaftar di server: gagal, BLE diputus, tidak ada salam', () async {
+      fakeApi.credentialResult = OperationResult.failure(
+        'Panel "P5-BUS-01" belum terdaftar di server.',
+      );
+      final provider = buildProvider(connected: false);
+
+      final result = await provider.connectToDevice(device);
+
+      expect(result.success, isFalse);
+      expect(result.message, contains('belum terdaftar'));
+      expect(provider.isBleConnected, isFalse);
+      expect(fakeBle.helloCallCount, 0);
+      expect(fakeBle.disconnectCallCount, 1);
+    });
+
+    test('salam ditolak (kunci panel diganti): minta kredensial baru lalu coba sekali lagi', () async {
+      fakeBle.helloResults.addAll([BleSendResult.rejectedPacket, BleSendResult.ok]);
+      final provider = buildProvider(connected: false);
+
+      final result = await provider.connectToDevice(device);
+
+      expect(result.success, isTrue);
+      expect(fakeBle.helloCallCount, 2);
+      expect(fakeApi.fetchCredentialCallCount, 2);
+    });
+
+    test('salam tetap ditolak setelah kredensial baru: gagal dan diputus', () async {
+      fakeBle.helloResults.addAll([BleSendResult.rejectedPacket, BleSendResult.rejectedPacket]);
+      final provider = buildProvider(connected: false);
+
+      final result = await provider.connectToDevice(device);
+
+      expect(result.success, isFalse);
+      expect(result.message, contains('menolak kunci akses'));
+      expect(provider.isBleConnected, isFalse);
+      expect(fakeBle.disconnectCallCount, 1);
+    });
+
+    test('perangkat bukan panel P5: gagal tanpa meminta kredensial', () async {
+      fakeBle.connectThrows = true;
+      final provider = buildProvider(connected: false);
+
+      final result = await provider.connectToDevice(device);
+
+      expect(result.success, isFalse);
+      expect(result.message, contains('Gagal terhubung'));
+      expect(fakeApi.fetchCredentialCallCount, 0);
+    });
+  });
+
+  group('ConnectionProvider.sendPayload - kredensial kedaluwarsa', () {
+    test('panel menolak karena kedaluwarsa: perbarui kredensial lalu kirim ulang', () async {
+      fakeBle.payloadResults.addAll([BleSendResult.rejectedExpired, BleSendResult.ok]);
+      fakeApi.sendDisplayConfigResult = OperationResult.success(null);
+      final provider = buildProvider();
+
+      final result = await provider.sendPayload(samplePayload);
+
+      expect(result.success, isTrue);
+      expect(fakeBle.sendPayloadCallCount, 2);
+      expect(fakeApi.lastSentPayload, samplePayload);
+    });
+
+    test('memakai kredensial tersimpan yang masih lama berlaku tanpa ke server', () async {
+      fakeDeviceIdentity.savedCredentials['P5-TEST'] = testCredential(panel: 'P5-TEST');
+      fakeApi.sendDisplayConfigResult = OperationResult.success(null);
+      final provider = buildProvider();
+
+      await provider.sendPayload(samplePayload);
+
+      expect(fakeApi.fetchCredentialCallCount, 0);
     });
   });
 }

@@ -97,20 +97,14 @@ class StatusCard extends StatelessWidget {
                               ),
                             ),
                             onPressed: () async {
-                              final success = await prov.connectToDevice(
+                              final outcome = await prov.connectToDevice(
                                 result.device,
                               );
                               if (!ctx.mounted) return;
-                              if (success) {
-                                Navigator.pop(ctx);
-                              } else {
-                                ctx.showFeedback(
-                                  message:
-                                      'Gagal terhubung. Pastikan yang dipilih '
-                                      'adalah panel P5 dan posisinya dekat.',
-                                  color: AppColors.danger,
-                                );
-                              }
+                              // Tampilkan dulu, baru tutup: setelah pop, ctx
+                              // sudah tidak terpasang.
+                              ctx.showResult(outcome);
+                              if (outcome.success) Navigator.pop(ctx);
                             },
                             child: const Text(
                               'Hubungkan',
