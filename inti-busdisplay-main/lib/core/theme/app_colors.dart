@@ -22,6 +22,11 @@ class AppColors {
   static const Color textSecondary = Color(0xFF667085);
   static const Color textOnDark = Color(0xFFEDEFF5);
 
+  /// Biru muda logo INTI dan latar splash yang terang kebiruan.
+  static const Color brandSky = Color(0xFF009FDB);
+  static const Color splashBackground = Color(0xFFF7FAFE);
+  static const Color splashTitle = Color(0xFF1B2A55);
+
   static const Color ledBackground = Color(0xFF0E1A2F);
   static const Color ledText = Color(0xFFFFB300);
 
@@ -33,6 +38,15 @@ class AppColors {
   static const List<Color> statusGradient = [primary, primaryLight];
   static const List<Color> amberGradient = [Color(0xFFFFC24B), amberDeep];
 
-  /// Tombol utama: navy dengan gradasi sangat halus, seperti kartu sorotan.
-  static const List<Color> heroButtonGradient = [primary, primaryLight];
+  /// Tombol utama: navy yang bergradasi ke biru.
+  static const List<Color> heroButtonGradient = [primary, Color(0xFF3B78C2)];
+
+  /// Latar halaman pairing: biru sangat muda ke putih.
+  static const List<Color> softBackgroundGradient = [
+    Color(0xFFEAF2FB),
+    splashBackground,
+  ];
+
+  /// Isian teks: abu-abu kebiruan, sedikit lebih biru dari [subtleFill].
+  static const Color inputFill = Color(0xFFF1F5FB);
 }
