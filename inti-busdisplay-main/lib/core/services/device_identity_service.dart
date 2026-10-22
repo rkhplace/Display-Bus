@@ -66,7 +66,18 @@ class DeviceIdentityService {
   }
 
   Future<bool> isPaired() async {
-    final token = await getDeviceToken();
+    final String? token;
+    try {
+      token = await getDeviceToken();
+    } catch (e) {
+      // Biasanya terjadi setelah install ulang: Android memulihkan data
+      // terenkripsi dari backup, tapi kunci Keystore-nya sudah tidak ada,
+      // sehingga data tidak bisa dibaca lagi. Hapus supaya bisa dipasangkan
+      // ulang dari awal.
+      debugPrint('Penyimpanan aman tidak bisa dibaca, direset: $e');
+      await _resetStorage();
+      return false;
+    }
     if (token == null || token.isEmpty) return false;
 
     if (await _isLocalSessionExpired()) {
@@ -90,6 +101,14 @@ class DeviceIdentityService {
 
     final pairedAt = DateTime.fromMillisecondsSinceEpoch(millis);
     return DateTime.now().difference(pairedAt) > maxLocalSessionAge;
+  }
+
+  Future<void> _resetStorage() async {
+    try {
+      await _storage.deleteAll();
+    } catch (e) {
+      debugPrint('Gagal mereset penyimpanan aman: $e');
+    }
   }
 
   Future<void> clearPairing() async {

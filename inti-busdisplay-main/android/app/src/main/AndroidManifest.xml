@@ -23,7 +23,12 @@
     <application
         android:label="Smart Bus Display"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false">
+        <!-- Backup dimatikan: token pairing di flutter_secure_storage
+             terenkripsi dengan kunci Keystore yang tidak ikut di-backup, jadi
+             data hasil restore tidak bisa dibaca dan membuat app macet. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

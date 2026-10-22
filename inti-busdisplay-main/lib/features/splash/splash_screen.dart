@@ -17,6 +17,9 @@ class SplashScreen extends StatefulWidget {
   /// Lama minimum splash tampil sebelum pindah halaman.
   static const Duration minDisplay = Duration(milliseconds: 1600);
 
+  /// Batas waktu membaca status pairing dari penyimpanan aman.
+  static const Duration pairingCheckTimeout = Duration(seconds: 5);
+
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -79,7 +82,17 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigateNext() async {
-    final paired = await _apiService.isPaired();
+    // Splash tidak boleh macet: bila status pairing gagal atau terlalu lama
+    // dibaca, anggap belum dipasangkan dan buka halaman pairing.
+    bool paired;
+    try {
+      paired = await _apiService.isPaired().timeout(
+        SplashScreen.pairingCheckTimeout,
+      );
+    } catch (e) {
+      debugPrint('Gagal membaca status pairing: $e');
+      paired = false;
+    }
 
     if (!mounted) return;
 
