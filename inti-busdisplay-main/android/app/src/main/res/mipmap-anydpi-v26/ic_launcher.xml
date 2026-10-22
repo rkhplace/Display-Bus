@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ikon adaptif (Android 8+): logo di depan, latar gradasi + lengkungan
+     di belakang, supaya launcher bisa memotongnya bulat/kotak tanpa
+     memotong logo. Dibuat dari mockup ikon aplikasi. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
+</adaptive-icon>
