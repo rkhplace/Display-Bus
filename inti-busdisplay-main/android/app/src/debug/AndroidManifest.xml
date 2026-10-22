@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Hanya build debug: izinkan http ke backend lokal (BACKEND_SCHEME=http).
+         Build release tetap menolak http. -->
+    <application android:usesCleartextTraffic="true"/>
 </manifest>
