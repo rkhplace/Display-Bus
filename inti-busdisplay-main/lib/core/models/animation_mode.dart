@@ -14,6 +14,26 @@ enum AnimationMode {
 
   const AnimationMode(this.label, this.icon);
 
+  /// Penjelasan singkat untuk daftar pilihan mode.
+  String get description {
+    switch (this) {
+      case running:
+        return 'Teks berjalan terus dari kanan ke kiri';
+      case still:
+        return 'Teks diam di tengah panel';
+      case blink:
+        return 'Teks diam dan berkedip';
+      case scrollLeft:
+        return 'Teks bergeser ke kiri';
+      case scrollRight:
+        return 'Teks bergeser ke kanan';
+      case scrollUp:
+        return 'Teks bergeser ke atas';
+      case scrollDown:
+        return 'Teks bergeser ke bawah';
+    }
+  }
+
   static AnimationMode fromLabel(String? label) {
     return AnimationMode.values.firstWhere(
       (mode) => mode.label == label,
