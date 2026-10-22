@@ -8,6 +8,7 @@ import 'package:runningtext_app/core/providers/preset_provider.dart';
 import 'package:runningtext_app/core/providers/route_provider.dart';
 import 'package:runningtext_app/core/services/bluetooth_service.dart';
 import 'package:runningtext_app/core/theme/app_colors.dart';
+import 'package:runningtext_app/core/widgets/app_toast.dart';
 import 'package:runningtext_app/features/home/widgets/send_button.dart';
 import '../../../fakes/fake_api_service_for_connection.dart';
 import '../../../fakes/fake_ble_service.dart';
@@ -56,21 +57,23 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Color? snackBarColor(WidgetTester tester) =>
-      tester.widget<SnackBar>(find.byType(SnackBar)).backgroundColor;
+  Color toastColor(WidgetTester tester) =>
+      tester.widget<AppToastCard>(find.byType(AppToastCard)).color;
 
-  testWidgets('BLE sukses tapi server gagal: snackbar kuning', (tester) async {
+  testWidgets('BLE sukses tapi server gagal: notifikasi kuning', (
+    tester,
+  ) async {
     fakeApi.sendDisplayConfigResult = OperationResult.failure('down');
     await pumpCard(tester);
 
     await tester.tap(find.text('Kirim ke Display'));
     await tester.pumpAndSettle();
 
-    expect(snackBarColor(tester), AppColors.warning);
+    expect(toastColor(tester), AppColors.warning);
   });
 
   testWidgets(
-    'gagal di BLE setelah sinkron sebelumnya gagal: snackbar merah, bukan kuning',
+    'gagal di BLE setelah sinkron sebelumnya gagal: notifikasi merah, bukan kuning',
     (tester) async {
       fakeApi.sendDisplayConfigResult = OperationResult.failure('down');
       await connectionProvider.sendPayload({'route': 'x'});
@@ -82,7 +85,7 @@ void main() {
       await tester.tap(find.text('Kirim ke Display'));
       await tester.pumpAndSettle();
 
-      expect(snackBarColor(tester), AppColors.danger);
+      expect(toastColor(tester), AppColors.danger);
       expect(find.textContaining('Coba kirim ulang'), findsOneWidget);
     },
   );
