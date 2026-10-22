@@ -109,19 +109,24 @@ lib/
 │   │   └── app_theme.dart
 │   ├── utils/
 │   │   ├── display_payload_builder.dart  # Pure function pembangun payload
-│   │   └── feedback_extension.dart       # Extension SnackBar (context.showResult/showFeedback)
+│   │   └── feedback_extension.dart       # Extension notifikasi (context.showResult/showFeedback)
 │   └── widgets/
+│       ├── app_dialog.dart            # Dialog form/konfirmasi standar (AppFormDialog, FieldLabel)
+│       ├── app_sheet.dart             # Komponen bottom sheet (header, baris daftar, pesan kosong)
+│       ├── app_toast.dart             # Notifikasi singkat di atas layar (pengganti SnackBar)
 │       ├── modern_slider.dart
-│       └── primary_button.dart
+│       ├── primary_button.dart
+│       └── selection_sheet.dart       # Kolom pilihan + bottom sheet (pengganti DropdownButton)
 ├── features/
 │   ├── splash/
-│   │   └── splash_screen.dart         # Splash + cek status pairing
+│   │   └── splash_screen.dart         # Splash (logo + foto bus) + cek status pairing
 │   ├── pairing/
-│   │   └── pairing_screen.dart        # Layar input kode pairing
+│   │   └── pairing_screen.dart        # Layar input kode pairing + sheet bantuan
 │   ├── main_navigation/
 │   │   └── main_navigation.dart       # Layar kontrol responsif (2 kolom / 1 kolom)
 │   ├── home/
 │   │   └── widgets/
+│   │       ├── add_route_dialog.dart  # Form tambah rute + pratinjau Pergi/Pulang
 │   │       ├── app_header.dart
 │   │       ├── preview_card.dart      # Simulasi panel LED live (pakai AnimationMode)
 │   │       ├── status_card.dart       # Chip status panel (BLE) + pemindai + banner gagal sinkron
@@ -321,8 +326,8 @@ Kemungkinan hasil:
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BLE belum terhubung                     | Ditolak, muncul peringatan; tidak ada apa pun yang dikirim.                                                                                                      |
 | BLE gagal terkirim                      | Ditolak, muncul peringatan; server **tidak** ikut disinkronkan (mencegah data server dan panel tidak sesuai).                                                    |
-| BLE sukses, sinkron ke server sukses    | SnackBar hijau: berhasil sepenuhnya.                                                                                                                             |
-| BLE sukses, sinkron ke server **gagal** | SnackBar kuning (bukan hijau) + banner peringatan persisten di atas kartu Rute sampai di-dismiss, karena panel sudah berubah tapi data di server belum tentu sesuai. |
+| BLE sukses, sinkron ke server sukses    | Notifikasi hijau: berhasil sepenuhnya.                                                                                                                           |
+| BLE sukses, sinkron ke server **gagal** | Notifikasi kuning (bukan hijau) + banner peringatan persisten di atas kartu Rute sampai di-dismiss, karena panel sudah berubah tapi data di server belum tentu sesuai. |
 
 ---
 
@@ -415,7 +420,7 @@ Digunakan oleh seluruh provider agar UI layer bisa menampilkan feedback secara k
 
 ## Penanganan Error & Feedback
 
-Semua feedback ke pengguna (SnackBar) terpusat di `lib/core/utils/feedback_extension.dart`:
+Semua feedback ke pengguna terpusat di `lib/core/utils/feedback_extension.dart`. Notifikasi tampil sebagai toast di **atas** layar (`AppToast`) supaya tidak menutupi tombol Kirim di bawah; toast baru langsung menggantikan yang lama (tidak mengantre), dan bisa ditutup dengan ketuk atau geser ke atas:
 
 ```dart
 context.showFeedback(message: '...', color: AppColors.success);
@@ -424,8 +429,8 @@ context.showResult(result, fallbackSuccessMessage: '...');
 
 **Aturan penting untuk maintenance:**
 
-- Provider **tidak pernah** memanggil `ScaffoldMessenger` secara langsung. Jika menambah method baru di provider yang butuh feedback ke user, method tersebut harus mengembalikan `OperationResult`, bukan menampilkan SnackBar sendiri.
-- `context.showResult(result)` memilih warna berdasarkan `result.success` — untuk kasus **sukses sebagian** (mis. BLE sukses tapi sinkron server gagal), **jangan** pakai `showResult` mentah, karena akan menampilkan snackbar hijau yang menyesatkan. Cek flag terkait (contoh: `ConnectionProvider.lastApiSyncFailed`) dan panggil `showFeedback` langsung dengan `AppColors.warning`. Lihat implementasi `SendToDisplayButton._send()` sebagai referensi pola ini.
+- Provider **tidak pernah** memanggil `AppToast`/`ScaffoldMessenger` secara langsung. Jika menambah method baru di provider yang butuh feedback ke user, method tersebut harus mengembalikan `OperationResult`, bukan menampilkan notifikasi sendiri.
+- `context.showResult(result)` memilih warna berdasarkan `result.success` — untuk kasus **sukses sebagian** (mis. BLE sukses tapi sinkron server gagal), **jangan** pakai `showResult` mentah, karena akan menampilkan notifikasi hijau yang menyesatkan. Cek flag terkait (contoh: `ConnectionProvider.lastApiSyncFailed`) dan panggil `showFeedback` langsung dengan `AppColors.warning`. Lihat implementasi `SendToDisplayButton._send()` sebagai referensi pola ini.
 - Pesan error dari `ApiService` sudah melalui sanitasi (lihat [Autentikasi & Keamanan](#5-sanitasi-pesan-error)) — jangan menampilkan `response.body` mentah di widget mana pun.
 
 ---
