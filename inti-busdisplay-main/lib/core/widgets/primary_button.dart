@@ -11,6 +11,8 @@ class PrimaryButton extends StatelessWidget {
   final bool isLoading;
   final List<Color>? gradient;
   final Color? tintColor;
+  final double minHeight;
+  final double radius;
 
   const PrimaryButton({
     super.key,
@@ -21,6 +23,8 @@ class PrimaryButton extends StatelessWidget {
     this.isLoading = false,
     this.gradient,
     this.tintColor,
+    this.minHeight = 44,
+    this.radius = 8,
   });
 
   @override
@@ -36,12 +40,12 @@ class PrimaryButton extends StatelessWidget {
         color: useGradient
             ? Colors.transparent
             : (isOutline ? AppColors.card : base),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(radius),
         child: InkWell(
           onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(radius),
           child: Container(
-            constraints: const BoxConstraints(minHeight: 44),
+            constraints: BoxConstraints(minHeight: minHeight),
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
             decoration: BoxDecoration(
               gradient: useGradient
@@ -54,7 +58,7 @@ class PrimaryButton extends StatelessWidget {
               border: isOutline
                   ? Border.all(color: AppColors.inputBorder)
                   : null,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(radius),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
