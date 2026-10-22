@@ -5,6 +5,7 @@ import 'package:runningtext_app/core/models/operation_result.dart';
 import 'package:runningtext_app/core/providers/display_settings_provider.dart';
 import 'package:runningtext_app/core/providers/preset_provider.dart';
 import 'package:runningtext_app/core/providers/route_provider.dart';
+import 'package:runningtext_app/core/widgets/app_dialog.dart';
 import 'package:runningtext_app/features/home/widgets/quick_action_card.dart';
 import '../../../fakes/fake_preset_repository.dart';
 import '../../../fakes/fake_route_repository.dart';
@@ -65,13 +66,13 @@ void main() {
 
         await tester.tap(find.text('Simpan Preset'));
         await tester.pumpAndSettle();
-        expect(find.byType(AlertDialog), findsOneWidget);
+        expect(find.byType(AppFormDialog), findsOneWidget);
 
         await tester.enterText(find.byType(TextField), 'Preset Pagi');
         await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
         await tester.pumpAndSettle();
 
-        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.byType(AppFormDialog), findsNothing);
         expect(fakePresetRepo.lastSavedName, 'Preset Pagi');
         expect(
           fakePresetRepo.lastSavedPayload?['route'],
@@ -94,7 +95,8 @@ void main() {
       await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(AppFormDialog), findsOneWidget);
+      expect(find.text('Nama preset wajib diisi.'), findsOneWidget);
       expect(fakePresetRepo.lastSavedName, isNull);
     });
   });

@@ -33,6 +33,41 @@ class AppTheme {
         backgroundColor: AppColors.card,
         surfaceTintColor: Colors.transparent,
       ),
+      // Semua isian teks: latar biru keabuan, tanpa garis, garis biru saat
+      // fokus.
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.inputFill,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+        hintStyle: TextStyle(
+          color: AppColors.textSecondary.withValues(alpha: 0.6),
+          fontSize: 14,
+        ),
+        prefixIconColor: AppColors.textSecondary,
+        counterStyle: const TextStyle(
+          fontSize: 11,
+          color: AppColors.textSecondary,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(
+            color: AppColors.primaryLight,
+            width: 1.5,
+          ),
+        ),
+      ),
       dividerTheme: const DividerThemeData(
         color: AppColors.cardBorder,
         thickness: 1,

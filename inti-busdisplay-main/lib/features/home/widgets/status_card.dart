@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/connection_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/feedback_extension.dart';
+import '../../../core/widgets/app_sheet.dart';
 
 class StatusCard extends StatelessWidget {
   const StatusCard({super.key});
@@ -11,117 +12,110 @@ class StatusCard extends StatelessWidget {
     final provider = context.read<ConnectionProvider>();
     provider.startBleScan();
 
+    // Id perangkat yang sedang dihubungkan, supaya tombolnya loading dan
+    // tidak bisa ditekan dua kali.
+    String? connectingId;
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Consumer<ConnectionProvider>(
-        builder: (context, prov, child) {
-          return Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Pindai Panel Display',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (prov.isScanning)
-                      const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      IconButton(
-                        icon: const Icon(Icons.refresh_rounded),
-                        onPressed: () => prov.startBleScan(),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                if (prov.scanResults.isEmpty && !prov.isScanning)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Center(
-                      child: Text(
-                        prov.scanError ?? 'Tidak ada perangkat ditemukan.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: prov.scanError != null
-                              ? AppColors.danger
-                              : null,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Flexible(
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: prov.scanResults.length,
-                      separatorBuilder: (context, index) =>
-                          const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final result = prov.scanResults[index];
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(
-                            Icons.bluetooth_rounded,
-                            color: AppColors.primary,
-                          ),
-                          title: Text(
-                            result.device.platformName,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(
-                            result.device.remoteId.toString(),
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          trailing: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: () async {
+      constraints: const BoxConstraints(maxWidth: 560),
+      shape: appSheetShape,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Consumer<ConnectionProvider>(
+          builder: (context, prov, child) {
+            final Widget body;
+            if (prov.scanResults.isEmpty) {
+              body = prov.isScanning
+                  ? const SheetMessage(
+                      icon: Icons.bluetooth_searching_rounded,
+                      message: 'Mencari panel di sekitar...',
+                      color: AppColors.primary,
+                    )
+                  : SheetMessage(
+                      icon: prov.scanError != null
+                          ? Icons.bluetooth_disabled_rounded
+                          : Icons.search_off_rounded,
+                      message:
+                          prov.scanError ?? 'Tidak ada perangkat ditemukan.',
+                      color: prov.scanError != null
+                          ? AppColors.danger
+                          : AppColors.textSecondary,
+                    );
+            } else {
+              body = ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                itemCount: prov.scanResults.length,
+                itemBuilder: (context, index) {
+                  final result = prov.scanResults[index];
+                  final id = result.device.remoteId.toString();
+                  final name = result.device.platformName;
+                  final connecting = connectingId == id;
+
+                  return SheetListTile(
+                    icon: Icons.bluetooth_rounded,
+                    title: name.isEmpty ? 'Panel tanpa nama' : name,
+                    subtitle: id,
+                    action: SheetActionButton(
+                      label: connecting ? 'Menghubungkan...' : 'Hubungkan',
+                      onPressed: connectingId != null
+                          ? null
+                          : () async {
+                              setSheetState(() => connectingId = id);
                               final outcome = await prov.connectToDevice(
                                 result.device,
                               );
                               if (!ctx.mounted) return;
+                              setSheetState(() => connectingId = null);
                               // Tampilkan dulu, baru tutup: setelah pop, ctx
                               // sudah tidak terpasang.
                               ctx.showResult(outcome);
                               if (outcome.success) Navigator.pop(ctx);
                             },
-                            child: const Text(
-                              'Hubungkan',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
                     ),
+                  );
+                },
+              );
+            }
+
+            return ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SheetHeader(
+                    title: 'Pindai Panel Display',
+                    subtitle: 'Pilih panel di sekitar untuk dihubungkan.',
+                    trailing: prov.isScanning
+                        ? const Padding(
+                            padding: EdgeInsets.all(14),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            tooltip: 'Pindai ulang',
+                            icon: const Icon(
+                              Icons.refresh_rounded,
+                              color: AppColors.primary,
+                            ),
+                            onPressed: prov.startBleScan,
+                          ),
                   ),
-              ],
-            ),
-          );
-        },
+                  Flexible(child: body),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

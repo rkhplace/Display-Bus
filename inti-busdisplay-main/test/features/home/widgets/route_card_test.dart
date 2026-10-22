@@ -27,6 +27,42 @@ void main() {
     });
   });
 
+  group('RouteCard - memilih rute', () {
+    testWidgets('memilih rute lewat bottom sheet mengganti rute aktif', (
+      tester,
+    ) async {
+      final fakeRepo = FakeRouteRepository()
+        ..routesToReturn = [
+          RouteModel(
+            id: 'r1',
+            code: 'B1',
+            origin: 'Bandung',
+            destination: 'Garut',
+          ),
+          RouteModel(
+            id: 'r2',
+            code: 'B2',
+            origin: 'Bandung',
+            destination: 'Jakarta',
+          ),
+        ];
+      final provider = RouteProvider(routeRepository: fakeRepo);
+
+      await tester.pumpWidget(_wrap(provider));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.keyboard_arrow_down_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('Pilih Rute'), findsOneWidget);
+
+      await tester.tap(find.text('Bandung → Jakarta'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pilih Rute'), findsNothing);
+      expect(provider.selectedRoute.code, 'B2');
+    });
+  });
+
   group('RouteCard - menambah rute via dialog', () {
     late FakeRouteRepository fakeRepo;
     late RouteProvider provider;
@@ -37,7 +73,7 @@ void main() {
     });
 
     testWidgets(
-      'berhasil menambah rute baru, memanggil repository, dan menampilkan SnackBar sukses',
+      'berhasil menambah rute baru, memanggil repository, dan menampilkan notifikasi sukses',
       (tester) async {
         fakeRepo.addRouteResult = OperationResult.success(
           RouteModel(
@@ -89,6 +125,8 @@ void main() {
           find.text('Kode, asal, dan tujuan rute wajib diisi.'),
           findsOneWidget,
         );
+        // Dialog tetap terbuka supaya isian tidak hilang.
+        expect(find.text('Tambah Rute Baru'), findsOneWidget);
       },
     );
 
@@ -117,6 +155,36 @@ void main() {
         expect(find.text('Kode rute "B1" sudah terdaftar.'), findsOneWidget);
       },
     );
+  });
+
+  group('RouteCard - form tambah rute', () {
+    testWidgets('pratinjau Pergi/Pulang mengikuti isian dan tombol tukar', (
+      tester,
+    ) async {
+      final provider = RouteProvider(routeRepository: FakeRouteRepository());
+
+      await tester.pumpWidget(_wrap(provider));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.add_rounded));
+      await tester.pumpAndSettle();
+
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'b5');
+      await tester.enterText(fields.at(1), 'Bandung');
+      await tester.enterText(fields.at(2), 'Lembang');
+      await tester.pump();
+
+      expect(find.text('B5 | BANDUNG → LEMBANG'), findsOneWidget);
+      expect(find.text('B5 | LEMBANG → BANDUNG'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.swap_vert_rounded));
+      await tester.pump();
+
+      final origin = tester.widget<TextField>(fields.at(1));
+      final destination = tester.widget<TextField>(fields.at(2));
+      expect(origin.controller!.text, 'Lembang');
+      expect(destination.controller!.text, 'Bandung');
+    });
   });
 
   group('RouteCard - menghapus rute via dialog konfirmasi', () {

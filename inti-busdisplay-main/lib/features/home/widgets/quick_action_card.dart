@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../../../core/models/operation_result.dart';
 import '../../../core/providers/display_settings_provider.dart';
 import '../../../core/providers/preset_provider.dart';
 import '../../../core/providers/route_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/display_payload_builder.dart';
 import '../../../core/utils/feedback_extension.dart';
+import '../../../core/widgets/app_dialog.dart';
+import '../../../core/widgets/app_sheet.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/section_card.dart';
 
@@ -26,75 +30,52 @@ Map<String, dynamic> buildCurrentPayload(BuildContext context) {
 class QuickActionCard extends StatelessWidget {
   const QuickActionCard({super.key});
 
-  void _showSavePresetDialog(BuildContext context) {
+  Future<void> _showSavePresetDialog(BuildContext context) async {
+    final presetProvider = context.read<PresetProvider>();
+    final payload = buildCurrentPayload(context);
     final nameController = TextEditingController();
 
-    showDialog(
+    final result = await showDialog<OperationResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        scrollable: true,
-        backgroundColor: AppColors.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-        titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
-        actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-        title: const Text(
-          'Simpan Preset',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        content: TextField(
-          controller: nameController,
-          decoration: InputDecoration(
-            hintText: 'Nama Preset (Cth: Pagi Hari)',
-            filled: true,
-            fillColor: AppColors.subtleFill,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Batal',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+      builder: (ctx) => AppFormDialog(
+        icon: Icons.bookmark_add_rounded,
+        title: 'Simpan Preset',
+        subtitle: 'Simpan rute dan pengaturan tampilan saat ini.',
+        submitLabel: 'Simpan',
+        onSubmit: () async {
+          final name = nameController.text.trim();
+          if (name.isEmpty) {
+            return OperationResult.failure('Nama preset wajib diisi.');
+          }
+          return presetProvider.saveCurrentPreset(name, payload);
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const FieldLabel('Nama Preset'),
+            TextField(
+              controller: nameController,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                hintText: 'Cth: Pagi Hari',
+                prefixIcon: Icon(Icons.label_outline_rounded, size: 20),
               ),
             ),
-            onPressed: () async {
-              if (nameController.text.trim().isEmpty) return;
-
-              final payload = buildCurrentPayload(context);
-              final result = await context
-                  .read<PresetProvider>()
-                  .saveCurrentPreset(nameController.text.trim(), payload);
-
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) {
-                context.showResult(
-                  result,
-                  fallbackSuccessMessage: 'Preset berhasil disimpan!',
-                );
-              }
-            },
-            child: const Text('Simpan', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+            const SizedBox(height: 14),
+            _PresetSummary(payload: payload),
+          ],
+        ),
       ),
     );
+
+    if (result != null && context.mounted) {
+      context.showResult(
+        result,
+        fallbackSuccessMessage: 'Preset berhasil disimpan!',
+      );
+    }
   }
 
   void _applyPreset(
@@ -143,71 +124,58 @@ class QuickActionCard extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: AppColors.card,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
+      constraints: const BoxConstraints(maxWidth: 560),
+      shape: appSheetShape,
+      builder: (ctx) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Muat Preset Tersimpan',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            const SheetHeader(
+              title: 'Muat Preset',
+              subtitle: 'Pilih preset untuk diterapkan ke pengaturan.',
             ),
-            const SizedBox(height: 16),
-            FutureBuilder<List<dynamic>>(
-              future: presetProvider.getSavedPresets(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 20),
-                    child: Center(child: Text('Belum ada preset tersimpan.')),
-                  );
-                }
+            Flexible(
+              child: FutureBuilder<List<dynamic>>(
+                future: presetProvider.getSavedPresets(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const SheetMessage(
+                      icon: Icons.bookmarks_outlined,
+                      message: 'Belum ada preset tersimpan.',
+                    );
+                  }
 
-                final presets = snapshot.data!;
-                return Flexible(
-                  child: ListView.separated(
+                  final presets = snapshot.data!;
+                  return ListView.builder(
                     shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     itemCount: presets.length,
-                    separatorBuilder: (context, index) =>
-                        const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final preset = presets[index];
                       final payload = preset['payload'];
                       final String? presetId = preset['id'] as String?;
                       final String? presetName = preset['name'] as String?;
 
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(
-                          Icons.display_settings_rounded,
-                          color: AppColors.textSecondary,
-                        ),
-                        title: Text(
-                          presetName ?? 'Preset',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text(
-                          '${payload['route']} • ${payload['animation']}',
-                          style: const TextStyle(fontSize: 12),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                      return SheetListTile(
+                        icon: Icons.bookmark_rounded,
+                        title: presetName ?? 'Preset',
+                        subtitle:
+                            '${payload['route']} • ${payload['animation']}',
+                        action: SheetActionButton(
+                          label: 'Pilih',
                           onPressed: () {
                             _applyPreset(
                               context,
@@ -217,16 +185,12 @@ class QuickActionCard extends StatelessWidget {
                             );
                             Navigator.pop(ctx);
                           },
-                          child: const Text(
-                            'Pilih',
-                            style: TextStyle(color: Colors.white, fontSize: 12),
-                          ),
                         ),
                       );
                     },
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -234,59 +198,53 @@ class QuickActionCard extends StatelessWidget {
     );
   }
 
-  void _confirmOverwrite(BuildContext context, String presetName) {
-    showDialog(
+  Future<void> _confirmOverwrite(
+    BuildContext context,
+    String presetName,
+  ) async {
+    final presetProvider = context.read<PresetProvider>();
+    final payload = buildCurrentPayload(context);
+
+    final result = await showDialog<OperationResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text(
-          'Timpa Preset',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        content: Text(
-          'Timpa preset "$presetName" dengan pengaturan saat ini? '
-          'Data lama pada preset ini akan diganti.',
-          style: const TextStyle(height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Batal',
-              style: TextStyle(
+      builder: (ctx) => AppFormDialog(
+        icon: Icons.published_with_changes_rounded,
+        title: 'Timpa Preset',
+        subtitle: 'Data lama pada preset ini akan diganti.',
+        submitLabel: 'Timpa',
+        onSubmit: () => presetProvider.overwriteLoadedPreset(payload),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text.rich(
+              TextSpan(
+                text: 'Ganti isi preset ',
+                children: [
+                  TextSpan(
+                    text: '"$presetName"',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const TextSpan(text: ' dengan pengaturan berikut?'),
+                ],
+              ),
+              style: GoogleFonts.poppins(
+                fontSize: 13.5,
                 color: AppColors.textSecondary,
-                fontWeight: FontWeight.bold,
+                height: 1.5,
               ),
             ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 0,
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final payload = buildCurrentPayload(context);
-              final result = await context
-                  .read<PresetProvider>()
-                  .overwriteLoadedPreset(payload);
-              if (context.mounted) context.showResult(result);
-            },
-            child: const Text(
-              'Timpa',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            _PresetSummary(payload: payload),
+          ],
+        ),
       ),
     );
+
+    if (result != null && context.mounted) context.showResult(result);
   }
 
   void _resetToDefault(BuildContext context) {
@@ -362,6 +320,84 @@ class QuickActionCard extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Ringkasan isi preset (rute, arah, animasi, slider) di dialog simpan/timpa.
+class _PresetSummary extends StatelessWidget {
+  final Map<String, dynamic> payload;
+
+  const _PresetSummary({required this.payload});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.subtleFill,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'YANG DISIMPAN',
+            style: GoogleFonts.poppins(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.6,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _SummaryRow(
+            icon: Icons.route_rounded,
+            text: '${payload['route']} (${payload['direction']})',
+          ),
+          _SummaryRow(
+            icon: Icons.animation_rounded,
+            text: '${payload['animation']}',
+          ),
+          _SummaryRow(
+            icon: Icons.tune_rounded,
+            text:
+                'Kecepatan ${payload['speed']} • Kecerahan '
+                '${payload['brightness']} • Ukuran ${payload['fontSize']}',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _SummaryRow({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 12.5,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
         ],
       ),
     );

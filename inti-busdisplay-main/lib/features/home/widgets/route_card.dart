@@ -1,106 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../../../core/models/operation_result.dart';
 import '../../../core/models/route_model.dart';
 import '../../../core/providers/route_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/feedback_extension.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../../core/widgets/section_card.dart';
+import '../../../core/widgets/selection_sheet.dart';
+import 'add_route_dialog.dart';
 
 class RouteCard extends StatelessWidget {
   const RouteCard({super.key});
 
-  void _showAddRouteDialog(BuildContext context) {
-    final codeController = TextEditingController();
-    final originController = TextEditingController();
-    final destinationController = TextEditingController();
-
-    showDialog(
+  Future<void> _showAddRouteDialog(BuildContext context) async {
+    final provider = context.read<RouteProvider>();
+    final result = await showDialog<OperationResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        scrollable: true,
-        alignment: Alignment.topCenter,
-        backgroundColor: AppColors.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-        titlePadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-        actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
-        title: Text(
-          'Tambah Rute Baru',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 18),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _RouteFormField(
-              controller: codeController,
-              hint: 'Kode Rute (Cth: B5)',
-            ),
-            const SizedBox(height: 10),
-            _RouteFormField(
-              controller: originController,
-              hint: 'Kota Asal (Cth: Bandung)',
-            ),
-            const SizedBox(height: 10),
-            _RouteFormField(
-              controller: destinationController,
-              hint: 'Kota Tujuan (Cth: Lembang)',
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Batal',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
-            ),
-            onPressed: () async {
-              final result = await context.read<RouteProvider>().addRoute(
-                code: codeController.text,
-                origin: originController.text,
-                destination: destinationController.text,
-              );
-
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) {
-                context.showResult(
-                  result,
-                  fallbackSuccessMessage: 'Rute berhasil ditambahkan.',
-                );
-              }
-            },
-            child: const Text(
-              'Simpan',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
+      builder: (ctx) => AddRouteDialog(provider: provider),
     );
+    if (result != null && context.mounted) {
+      context.showResult(
+        result,
+        fallbackSuccessMessage: 'Rute berhasil ditambahkan.',
+      );
+    }
   }
 
-  void _showDeleteRouteDialog(
+  Future<void> _showDeleteRouteDialog(
     BuildContext context,
     RouteModel currentRoute,
     RouteProvider provider,
-  ) {
+  ) async {
     if (provider.routes.length <= 1) {
       context.showFeedback(
         message: 'Minimal harus ada 1 rute tersisa!',
@@ -109,54 +41,58 @@ class RouteCard extends StatelessWidget {
       return;
     }
 
-    showDialog(
+    final result = await showDialog<OperationResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'Hapus Rute',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 18),
-        ),
-        content: Text(
-          'Hapus "${currentRoute.fullDisplayName}"? Tindakan ini tidak dapat dibatalkan.',
-          style: const TextStyle(height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              'Batal',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.bold,
+      builder: (ctx) => AppFormDialog(
+        icon: Icons.delete_outline_rounded,
+        title: 'Hapus Rute',
+        subtitle: 'Tindakan ini tidak dapat dibatalkan.',
+        submitLabel: 'Hapus',
+        destructive: true,
+        onSubmit: () => provider.deleteRoute(currentRoute),
+        child: Text.rich(
+          TextSpan(
+            text: 'Rute ',
+            children: [
+              TextSpan(
+                text: '"${currentRoute.fullDisplayName}"',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
+              const TextSpan(
+                text: ' akan dihapus dari server dan semua HP yang terhubung.',
+              ),
+            ],
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
-            ),
-            onPressed: () async {
-              final result = await provider.deleteRoute(currentRoute);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) context.showResult(result);
-            },
-            child: const Text(
-              'Hapus',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          style: GoogleFonts.poppins(
+            fontSize: 13.5,
+            color: AppColors.textSecondary,
+            height: 1.5,
           ),
-        ],
+        ),
       ),
     );
+    if (result != null && context.mounted) context.showResult(result);
+  }
+
+  Future<void> _pickRoute(BuildContext context, RouteProvider provider) async {
+    final picked = await showSelectionSheet<RouteModel>(
+      context: context,
+      title: 'Pilih Rute',
+      selected: provider.selectedRoute,
+      options: provider.routes
+          .map(
+            (r) => SelectionOption(
+              value: r,
+              badge: r.code,
+              title: '${r.origin} → ${r.destination}',
+            ),
+          )
+          .toList(),
+    );
+    if (picked != null) provider.setRoute(picked);
   }
 
   @override
@@ -234,58 +170,9 @@ class RouteCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Container(
-                  height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.inputBorder),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<RouteModel>(
-                      value: selected,
-                      isExpanded: true,
-                      borderRadius: BorderRadius.circular(8),
-                      icon: const Icon(
-                        Icons.unfold_more_rounded,
-                        color: AppColors.textSecondary,
-                        size: 18,
-                      ),
-                      selectedItemBuilder: (context) => routeProvider.routes
-                          .map(
-                            (e) => Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                e.apiRouteName,
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textPrimary,
-                                  fontSize: 13.5,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      items: routeProvider.routes
-                          .map(
-                            (e) => DropdownMenuItem<RouteModel>(
-                              value: e,
-                              child: Text(
-                                e.fullDisplayName,
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (val) => routeProvider.setRoute(val!),
-                    ),
-                  ),
+                child: SelectField(
+                  label: '${selected.origin} → ${selected.destination}',
+                  onTap: () => _pickRoute(context, routeProvider),
                 ),
               ),
             ],
@@ -332,36 +219,6 @@ class RouteCard extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _RouteFormField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-
-  const _RouteFormField({required this.controller, required this.hint});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(
-          color: AppColors.textSecondary.withValues(alpha: 0.5),
-        ),
-        filled: true,
-        fillColor: AppColors.subtleFill,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
-        ),
       ),
     );
   }
